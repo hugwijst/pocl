@@ -98,7 +98,8 @@ int pocl_llvm_get_kernel_names( cl_program program, const char **knames, unsigne
 int pocl_llvm_codegen ( cl_kernel kernel,
                         cl_device_id device,
                         const char *infile,
-                        const char *outfile);
+                        const char *outfile,
+                        char as_obj);
 
 /* Parse program file and populate program's llvm_irs */
 void

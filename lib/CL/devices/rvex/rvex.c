@@ -1,4 +1,4 @@
-/* basic.c - a minimalistic pocl device driver layer implementation
+/* rvex.c - a minimalistic pocl device driver layer implementation
 
    Copyright (c) 2011-2013 Universidad Rey Juan Carlos and
                  2011-2014 Pekka Jääskeläinen / Tampere University of Technology
@@ -22,7 +22,7 @@
    THE SOFTWARE.
 */
 
-#include "basic.h"
+#include "rvex.h"
 #include "cpuinfo.h"
 #include "topology/pocl_topology.h"
 #include "common.h"
@@ -53,7 +53,7 @@ struct data {
   lt_dlhandle current_dlhandle;
 };
 
-const cl_image_format supported_image_formats[] = {
+static const cl_image_format supported_image_formats[] = {
     { CL_R, CL_SNORM_INT8 },
     { CL_R, CL_SNORM_INT16 },
     { CL_R, CL_UNORM_INT8 },
@@ -189,37 +189,37 @@ const cl_image_format supported_image_formats[] = {
 
 
 void
-pocl_basic_init_device_ops(struct pocl_device_ops *ops)
+pocl_rvex_init_device_ops(struct pocl_device_ops *ops)
 {
-  ops->device_name = "basic";
+  ops->device_name = "rvex";
 
-  ops->init_device_infos = pocl_basic_init_device_infos;
-  ops->probe = pocl_basic_probe;
-  ops->uninit = pocl_basic_uninit;
-  ops->init = pocl_basic_init;
-  ops->alloc_mem_obj = pocl_basic_alloc_mem_obj;
-  ops->free = pocl_basic_free;
-  ops->read = pocl_basic_read;
-  ops->read_rect = pocl_basic_read_rect;
-  ops->write = pocl_basic_write;
-  ops->write_rect = pocl_basic_write_rect;
-  ops->copy = pocl_basic_copy;
-  ops->copy_rect = pocl_basic_copy_rect;
-  ops->fill_rect = pocl_basic_fill_rect;
-  ops->map_mem = pocl_basic_map_mem;
-  ops->compile_submitted_kernels = pocl_basic_compile_submitted_kernels;
-  ops->run = pocl_basic_run;
-  ops->run_native = pocl_basic_run_native;
-  ops->get_timer_value = pocl_basic_get_timer_value;
-  ops->get_supported_image_formats = pocl_basic_get_supported_image_formats;
+  ops->init_device_infos = pocl_rvex_init_device_infos;
+  ops->probe = pocl_rvex_probe;
+  ops->uninit = pocl_rvex_uninit;
+  ops->init = pocl_rvex_init;
+  ops->alloc_mem_obj = pocl_rvex_alloc_mem_obj;
+  ops->free = pocl_rvex_free;
+  ops->read = pocl_rvex_read;
+  ops->read_rect = pocl_rvex_read_rect;
+  ops->write = pocl_rvex_write;
+  ops->write_rect = pocl_rvex_write_rect;
+  ops->copy = pocl_rvex_copy;
+  ops->copy_rect = pocl_rvex_copy_rect;
+  ops->fill_rect = pocl_rvex_fill_rect;
+  ops->map_mem = pocl_rvex_map_mem;
+  ops->compile_submitted_kernels = pocl_rvex_compile_submitted_kernels;
+  ops->run = pocl_rvex_run;
+  ops->run_native = pocl_rvex_run_native;
+  ops->get_timer_value = pocl_rvex_get_timer_value;
+  ops->get_supported_image_formats = pocl_rvex_get_supported_image_formats;
 }
 
 void
-pocl_basic_init_device_infos(struct _cl_device_id* dev)
+pocl_rvex_init_device_infos(struct _cl_device_id* dev)
 {
-  dev->type = CL_DEVICE_TYPE_CPU;
+  dev->type = CL_DEVICE_TYPE_ACCELERATOR;
   dev->vendor_id = 0;
-  dev->max_compute_units = 0;
+  dev->max_compute_units = 4;
   dev->max_work_item_dimensions = 3;
   dev->max_work_item_sizes[0] = SIZE_MAX;
   dev->max_work_item_sizes[1] = SIZE_MAX;
@@ -278,7 +278,7 @@ pocl_basic_init_device_infos(struct _cl_device_id* dev)
   dev->error_correction_support = CL_FALSE;
   dev->host_unified_memory = CL_TRUE;
   dev->profiling_timer_resolution = 0;
-  dev->endian_little = !(WORDS_BIGENDIAN);
+  dev->endian_little = CL_FALSE;
   dev->available = CL_TRUE;
   dev->compiler_available = CL_TRUE;
   dev->execution_capabilities = CL_EXEC_KERNEL | CL_EXEC_NATIVE_KERNEL;
@@ -286,55 +286,37 @@ pocl_basic_init_device_infos(struct _cl_device_id* dev)
   dev->platform = 0;
   dev->device_partition_properties[0] = 0;
   dev->printf_buffer_size = 0;
-  dev->vendor = "pocl";
+  dev->vendor = "TU_Delft";
   dev->profile = "FULL_PROFILE";
-  /* Note: The specification describes identifiers being delimited by
-     only a single space character. Some programs that check the device's
-     extension  string assume this rule. Future extension additions should
-     ensure that there is no more than a single space between
-     identifiers. */
-
-#ifndef _CL_DISABLE_LONG
-#define DOUBLE_EXT "cl_khr_fp64 "
-#else
-#define DOUBLE_EXT 
-#endif
-
-#ifndef _CL_DISABLE_HALF
-#define HALF_EXT "cl_khr_fp16 "
-#else
-#define HALF_EXT
-#endif
-
-  dev->extensions = DOUBLE_EXT HALF_EXT "cl_khr_byte_addressable_store";
-
-  dev->llvm_target_triplet = OCL_KERNEL_TARGET;
-  dev->llvm_cpu = OCL_KERNEL_TARGET_CPU;
-  dev->has_64bit_long = 1;
+  dev->long_name = NULL;
+  dev->extensions = "";
+  dev->llvm_target_triplet = "rvex";
+  dev->llvm_cpu = "";
+  dev->has_64bit_long = 0;
 }
 
 unsigned int
-pocl_basic_probe(struct pocl_device_ops *ops)
+pocl_rvex_probe(struct pocl_device_ops *ops)
 {
   int env_count = pocl_device_get_env_count(ops->device_name);
 
-  /* No env specified, so pthread will be used instead of basic */
+  /* No env specified, assume one device by default */
   if(env_count < 0)
-    return 0;
+    return 1;
 
   return env_count;
 }
 
 void
-pocl_basic_init (cl_device_id device, const char* parameters)
+pocl_rvex_init (cl_device_id device, const char* parameters)
 {
   struct data *d;
   static int global_mem_id;
-  static int first_basic_init = 1;
+  static int first_rvex_init = 1;
   
-  if (first_basic_init)
+  if (first_rvex_init)
     {
-      first_basic_init = 0;
+      first_rvex_init = 0;
       global_mem_id = device->dev_id;
     }
   device->global_mem_id = global_mem_id;
@@ -347,9 +329,9 @@ pocl_basic_init (cl_device_id device, const char* parameters)
   pocl_topology_detect_device_info(device);
   pocl_cpuinfo_detect_device_info(device);
 
-  /* The basic driver represents only one "compute unit" as
+  /* The rvex driver represents only one "compute unit" as
      it doesn't exploit multiple hardware threads. Multiple
-     basic devices can be still used for task level parallelism 
+     rvex devices can be still used for task level parallelism 
      using multiple OpenCL devices. */
   device->max_compute_units = 1;
 
@@ -363,7 +345,7 @@ pocl_basic_init (cl_device_id device, const char* parameters)
 }
 
 void *
-pocl_basic_malloc (void *device_data, cl_mem_flags flags,
+pocl_rvex_malloc (void *device_data, cl_mem_flags flags,
 		    size_t size, void *host_ptr)
 {
   void *b;
@@ -392,7 +374,7 @@ pocl_basic_malloc (void *device_data, cl_mem_flags flags,
 }
 
 cl_int
-pocl_basic_alloc_mem_obj (cl_device_id device, cl_mem mem_obj)
+pocl_rvex_alloc_mem_obj (cl_device_id device, cl_mem mem_obj)
 {
   void *b = NULL;
   cl_int flags = mem_obj->flags;
@@ -426,7 +408,7 @@ pocl_basic_alloc_mem_obj (cl_device_id device, cl_mem mem_obj)
 }
 
 void
-pocl_basic_free (void *data, cl_mem_flags flags, void *ptr)
+pocl_rvex_free (void *data, cl_mem_flags flags, void *ptr)
 {
   if (flags & CL_MEM_USE_HOST_PTR)
     return;
@@ -435,7 +417,7 @@ pocl_basic_free (void *data, cl_mem_flags flags, void *ptr)
 }
 
 void
-pocl_basic_read (void *data, void *host_ptr, const void *device_ptr, size_t cb)
+pocl_rvex_read (void *data, void *host_ptr, const void *device_ptr, size_t cb)
 {
   if (host_ptr == device_ptr)
     return;
@@ -444,7 +426,7 @@ pocl_basic_read (void *data, void *host_ptr, const void *device_ptr, size_t cb)
 }
 
 void
-pocl_basic_write (void *data, const void *host_ptr, void *device_ptr, size_t cb)
+pocl_rvex_write (void *data, const void *host_ptr, void *device_ptr, size_t cb)
 {
   if (host_ptr == device_ptr)
     return;
@@ -454,7 +436,7 @@ pocl_basic_write (void *data, const void *host_ptr, void *device_ptr, size_t cb)
 
 
 void
-pocl_basic_run 
+pocl_rvex_run 
 (void *data, 
  _cl_command_node* cmd)
 {
@@ -483,7 +465,7 @@ pocl_basic_run
       if (kernel->arg_info[i].is_local)
         {
           arguments[i] = malloc (sizeof (void *));
-          *(void **)(arguments[i]) = pocl_basic_malloc(data, 0, al->size, NULL);
+          *(void **)(arguments[i]) = pocl_rvex_malloc(data, 0, al->size, NULL);
         }
       else if (kernel->arg_info[i].type == POCL_ARG_TYPE_POINTER)
         {
@@ -504,19 +486,19 @@ pocl_basic_run
           dev_image_t di;
           fill_dev_image_t (&di, al, cmd->device);
 
-          void* devptr = pocl_basic_malloc (data, 0, sizeof(dev_image_t), NULL);
+          void* devptr = pocl_rvex_malloc (data, 0, sizeof(dev_image_t), NULL);
           arguments[i] = malloc (sizeof (void *));
           *(void **)(arguments[i]) = devptr; 
-          pocl_basic_write (data, &di, devptr, sizeof(dev_image_t));
+          pocl_rvex_write (data, &di, devptr, sizeof(dev_image_t));
         }
       else if (kernel->arg_info[i].type == POCL_ARG_TYPE_SAMPLER)
         {
           dev_sampler_t ds;
           
           arguments[i] = malloc (sizeof (void *));
-          *(void **)(arguments[i]) = pocl_basic_malloc 
+          *(void **)(arguments[i]) = pocl_rvex_malloc 
             (data, 0, sizeof(dev_sampler_t), NULL);
-          pocl_basic_write (data, &ds, *(void**)arguments[i], sizeof(dev_sampler_t));
+          pocl_rvex_write (data, &ds, *(void**)arguments[i], sizeof(dev_sampler_t));
         }
       else
         {
@@ -529,7 +511,7 @@ pocl_basic_run
     {
       al = &(cmd->command.run.arguments[i]);
       arguments[i] = malloc (sizeof (void *));
-      *(void **)(arguments[i]) = pocl_basic_malloc (data, 0, al->size, NULL);
+      *(void **)(arguments[i]) = pocl_rvex_malloc (data, 0, al->size, NULL);
     }
 
   for (z = 0; z < pc->num_groups[2]; ++z)
@@ -542,7 +524,9 @@ pocl_basic_run
               pc->group_id[1] = y;
               pc->group_id[2] = z;
 
+#if 0
               cmd->command.run.wg (arguments, pc);
+#endif
 
             }
         }
@@ -551,12 +535,12 @@ pocl_basic_run
     {
       if (kernel->arg_info[i].is_local)
         {
-          pocl_basic_free (data, 0, *(void **)(arguments[i]));
+          pocl_rvex_free (data, 0, *(void **)(arguments[i]));
           POCL_MEM_FREE(arguments[i]);
         }
       else if (kernel->arg_info[i].type == POCL_ARG_TYPE_IMAGE)
         {
-          pocl_basic_free (data, 0, *(void **)(arguments[i]));
+          pocl_rvex_free (data, 0, *(void **)(arguments[i]));
           POCL_MEM_FREE(arguments[i]);
         }
       else if (kernel->arg_info[i].type == POCL_ARG_TYPE_SAMPLER || 
@@ -569,22 +553,24 @@ pocl_basic_run
        i < kernel->num_args + kernel->num_locals;
        ++i)
     {
-      pocl_basic_free(data, 0, *(void **)(arguments[i]));
+      pocl_rvex_free(data, 0, *(void **)(arguments[i]));
       POCL_MEM_FREE(arguments[i]);
     }
   free(arguments);
 }
 
 void
-pocl_basic_run_native 
+pocl_rvex_run_native 
 (void *data, 
  _cl_command_node* cmd)
 {
+#if 0
   cmd->command.native.user_func(cmd->command.native.args);
+#endif
 }
 
 void
-pocl_basic_copy (void *data, const void *src_ptr, void *__restrict__ dst_ptr, size_t cb)
+pocl_rvex_copy (void *data, const void *src_ptr, void *__restrict__ dst_ptr, size_t cb)
 {
   if (src_ptr == dst_ptr)
     return;
@@ -593,7 +579,7 @@ pocl_basic_copy (void *data, const void *src_ptr, void *__restrict__ dst_ptr, si
 }
 
 void
-pocl_basic_copy_rect (void *data,
+pocl_rvex_copy_rect (void *data,
                       const void *__restrict const src_ptr,
                       void *__restrict__ const dst_ptr,
                       const size_t *__restrict__ const src_origin,
@@ -623,7 +609,7 @@ pocl_basic_copy_rect (void *data,
 }
 
 void
-pocl_basic_write_rect (void *data,
+pocl_rvex_write_rect (void *data,
                        const void *__restrict__ const host_ptr,
                        void *__restrict__ const device_ptr,
                        const size_t *__restrict__ const buffer_origin,
@@ -653,7 +639,7 @@ pocl_basic_write_rect (void *data,
 }
 
 void
-pocl_basic_read_rect (void *data,
+pocl_rvex_read_rect (void *data,
                       void *__restrict__ const host_ptr,
                       void *__restrict__ const device_ptr,
                       const size_t *__restrict__ const buffer_origin,
@@ -685,7 +671,7 @@ pocl_basic_read_rect (void *data,
 /* origin and region must be in original shape unlike in copy/read/write_rect()
  */
 void
-pocl_basic_fill_rect (void *data,
+pocl_rvex_fill_rect (void *data,
                       void *__restrict__ const device_ptr,
                       const size_t *__restrict__ const buffer_origin,
                       const size_t *__restrict__ const region,
@@ -710,7 +696,7 @@ pocl_basic_fill_rect (void *data,
 }
 
 void *
-pocl_basic_map_mem (void *data, void *buf_ptr, 
+pocl_rvex_map_mem (void *data, void *buf_ptr, 
                       size_t offset, size_t size,
                       void *host_ptr) 
 {
@@ -721,7 +707,7 @@ pocl_basic_map_mem (void *data, void *buf_ptr,
 }
 
 void
-pocl_basic_uninit (cl_device_id device)
+pocl_rvex_uninit (cl_device_id device)
 {
   struct data *d = (struct data*)device->data;
   POCL_MEM_FREE(d);
@@ -729,7 +715,7 @@ pocl_basic_uninit (cl_device_id device)
 }
 
 cl_ulong
-pocl_basic_get_timer_value (void *data) 
+pocl_rvex_get_timer_value (void *data) 
 {
 #ifndef _MSC_VER
   struct timeval current;
@@ -749,7 +735,7 @@ pocl_basic_get_timer_value (void *data)
 }
 
 cl_int 
-pocl_basic_get_supported_image_formats (cl_mem_flags flags,
+pocl_rvex_get_supported_image_formats (cl_mem_flags flags,
                                         const cl_image_format **image_formats,
                                         cl_int *num_img_formats)
 {
@@ -774,7 +760,7 @@ struct compiler_cache_item
 static compiler_cache_item *compiler_cache;
 static pocl_lock_t compiler_cache_lock;
 
-void check_compiler_cache (_cl_command_node *cmd)
+static void check_compiler_cache (_cl_command_node *cmd)
 {
   char workgroup_string[WORKGROUP_STRING_LENGTH];
   lt_dlhandle dlhandle;
@@ -802,7 +788,7 @@ void check_compiler_cache (_cl_command_node *cmd)
   const char* module_fn = llvm_codegen (cmd->command.run.tmp_dir,
                                         cmd->command.run.kernel,
                                         cmd->device,
-                                        1);
+                                        0);
   dlhandle = lt_dlopen (module_fn);
   if (dlhandle == NULL)
     {
@@ -823,7 +809,7 @@ void check_compiler_cache (_cl_command_node *cmd)
 }
 
 void
-pocl_basic_compile_submitted_kernels (_cl_command_node *cmd)
+pocl_rvex_compile_submitted_kernels (_cl_command_node *cmd)
 {
   if (cmd->type == CL_COMMAND_NDRANGE_KERNEL)
     check_compiler_cache (cmd);

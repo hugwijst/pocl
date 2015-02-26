@@ -54,7 +54,7 @@
  * @param return the generated binary filename.
  */
 const char*
-llvm_codegen (const char* tmpdir, cl_kernel kernel, cl_device_id device) {
+llvm_codegen (const char* tmpdir, cl_kernel kernel, cl_device_id device, char as_obj) {
 
   const char* pocl_verbose_ptr = 
     pocl_get_string_option("POCL_VERBOSE", (char*)NULL);
@@ -87,7 +87,7 @@ llvm_codegen (const char* tmpdir, cl_kernel kernel, cl_device_id device) {
                         "%s/%s", tmpdir, POCL_PARALLEL_BC_FILENAME);
       assert (error >= 0);
       
-      error = pocl_llvm_codegen( kernel, device, bytecode, objfile);
+      error = pocl_llvm_codegen( kernel, device, bytecode, objfile, as_obj);
       assert (error == 0);
 
       // clang is used as the linker driver in LINK_CMD

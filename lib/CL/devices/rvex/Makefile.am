@@ -1,9 +1,8 @@
 # Process this file with automake to produce Makefile.in (in this,
 # and all subdirectories).
-# Makefile.am for pocl/lib/devices.
+# Makefile.am for pocl/lib/CL/devices/rvex.
 # 
-# Copyright (c) 2011-2012 Universidad Rey Juan Carlos and 
-#                         Tampere University of Technology
+# Copyright (c) 2012 Pekka Jääskeläinen / Tampere University of Technology
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -23,32 +22,12 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-SUBDIRS = topology pthread basic rvex
+noinst_LTLIBRARIES = libpocl-devices-rvex.la
 
-noinst_LTLIBRARIES = libpocl-devices.la
+libpocl_devices_rvex_la_SOURCES = rvex.h rvex.c
 
-libpocl_devices_la_SOURCES = devices.h devices.c bufalloc.c dev_image.h \
-	prototypes.inc common.h common.c bufalloc.h cpuinfo.c cpuinfo.h
-libpocl_devices_la_LIBADD = pthread/libpocl-devices-pthread.la \
-	basic/libpocl-devices-basic.la rvex/libpocl-devices-rvex.la \
-	topology/libpocl-devices-topology.la
-
-libpocl_devices_la_CPPFLAGS = \
-  -I$(top_srcdir)/fix-include \
-  -I$(top_srcdir)/include \
-  -I$(top_srcdir)/lib/CL/devices \
-  -I$(top_srcdir)/lib/CL/devices/tce \
-  -I$(top_srcdir)/lib/CL \
-  $(OCL_ICD_CFLAGS)
-
-if TCE_AVAILABLE
-SUBDIRS += tce
-libpocl_devices_la_LIBADD += tce/libpocl-devices-tce.la
-endif
-
-if BUILD_SPU
-SUBDIRS += cellspu
-libpocl_devices_la_LIBADD += cellspu/libpocl-devices-cellspu.la
-endif
+libpocl_devices_rvex_la_CPPFLAGS = -I$(top_srcdir)/fix-include -I$(top_srcdir)/include \
+-I$(top_srcdir)/lib/CL/devices -I$(top_srcdir)/lib/CL $(OCL_ICD_CFLAGS)
+libpocl_devices_rvex_la_LDFLAGS = --version-info ${LIB_VERSION}
 
 EXTRA_DIST = CMakeLists.txt

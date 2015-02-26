@@ -286,7 +286,7 @@ int pocl_llvm_build_program(cl_program program,
   // This is required otherwise the initialization fails with
   // unknown triplet ''
   ss << "-triple=" << device->llvm_target_triplet << " ";
-  if (device->llvm_cpu != NULL)
+  if (device->llvm_cpu != NULL && strncmp(device->llvm_cpu, "", 1) != 0)
     ss << "-target-cpu " << device->llvm_cpu << " ";
   ss << user_options << " ";
   std::istream_iterator<std::string> begin(ss);
@@ -1409,7 +1409,8 @@ int
 pocl_llvm_codegen(cl_kernel kernel,
                   cl_device_id device,
                   const char *infilename,
-                  const char *outfilename)
+                  const char *outfilename,
+                  char as_obj)
 {
     SMDiagnostic Err;
 #if defined LLVM_3_2 || defined LLVM_3_3
@@ -1450,9 +1451,14 @@ pocl_llvm_codegen(cl_kernel kernel,
 #endif
     // TODO: better error check
     formatted_raw_ostream FOS(outfile.os());
-    llvm::MCContext *mcc;
-    if(target->addPassesToEmitMC(PM, mcc, FOS, llvm::TargetMachine::CGFT_ObjectFile))
-        return 1;
+    if (as_obj) {
+        llvm::MCContext *mcc;
+        if(target->addPassesToEmitMC(PM, mcc, FOS))
+            return 1;
+    } else {
+        if(target->addPassesToEmitFile(PM, FOS, llvm::TargetMachine::CGFT_AssemblyFile))
+            return 1;
+    }
 
     PM.run(*input);
     outfile.keep();
