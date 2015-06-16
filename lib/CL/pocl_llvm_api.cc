@@ -67,6 +67,7 @@
 #include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetLibraryInfo.h"
+#include "llvm/Target/TargetSubtargetInfo.h"
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/SubtargetFeature.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
@@ -1209,6 +1210,10 @@ kernel_library
           kernellib += "cellspu";
         }
 #endif
+      else if (triple.getArch() == Triple::rvex)
+        {
+          kernellib += "rvex";
+        }
       else 
         {
           kernellib += "host";
@@ -1440,14 +1445,21 @@ pocl_llvm_codegen(cl_kernel kernel,
     }
 
     // TODO: get DataLayout from the 'device'
-#if defined LLVM_3_2 || defined LLVM_3_3 || defined LLVM_3_4
     const DataLayout *TD = NULL;
+#if defined LLVM_3_2 || defined LLVM_3_3 || defined LLVM_3_4
     if (target != NULL)
       TD = target->getDataLayout();
     if (TD != NULL)
         PM.add(new DataLayout(*TD));
     else
         PM.add(new DataLayout(input));
+#else
+    if (target != NULL)
+      TD = target->getSubtargetImpl()->getDataLayout();
+
+    if (TD != NULL)
+      input->setDataLayout(TD);
+    PM.add(new DataLayoutPass());
 #endif
     // TODO: better error check
     formatted_raw_ostream FOS(outfile.os());

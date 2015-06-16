@@ -404,6 +404,12 @@ endif()
 
 #*********************************************************************
 
+if(OCL_TARGETS MATCHES "rvex")
+  add_subdirectory("rvex")
+endif()
+
+#*********************************************************************
+
 if(OCL_TARGETS MATCHES "tce")
   add_subdirectory("tce")
 endif()

@@ -1012,7 +1012,7 @@ case $host_cpu in
 esac
 
 
-kernel_dir="host"
+kernel_dir="host rvex"
 OCL_TARGETS=$kernel_dir
 HOST_CLANG_FLAGS="$HOST_CLANG_FLAGS ${CLANG_TARGET_OPTION}$llc_triple"
 HOST_LLC_FLAGS="$HOST_LLC_FLAGS -mtriple=$llc_triple"
@@ -1400,6 +1400,7 @@ AC_CONFIG_FILES([Makefile
                  lib/kernel/Makefile
                  lib/kernel/cellspu/Makefile
                  lib/kernel/host/Makefile
+                 lib/kernel/rvex/Makefile
                  lib/kernel/tce/Makefile
                  lib/poclu/Makefile
                  examples/Makefile

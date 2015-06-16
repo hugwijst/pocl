@@ -55,6 +55,7 @@ fi
 
 case $target in
     cellspu-*) target_dir="cellspu";;
+    rvex-*)    target_dir="rvex";;
     tce*)     target_dir="tce"
                target="tce-tut-llvm"
                ;;

@@ -1,8 +1,6 @@
-# Process this file with automake to produce Makefile.in (in this,
-# and all subdirectories).
-# Makefile.am for pocl/lib/CL/devices/rvex.
+# Process this file with automake to produce Makefile.in
 # 
-# Copyright (c) 2012 Pekka Jääskeläinen / Tampere University of Technology
+# Copyright (c) 2011 Universidad Rey Juan Carlos
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -22,12 +20,16 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-noinst_LTLIBRARIES = libpocl-devices-rvex.la
 
-libpocl_devices_rvex_la_SOURCES = rvex.h rvex.c rvex_compile.h rvex_compile.c
 
-libpocl_devices_rvex_la_CPPFLAGS = -I$(top_srcdir)/fix-include -I$(top_srcdir)/include \
--I$(top_srcdir)/lib/CL/devices -I$(top_srcdir)/lib/CL $(OCL_ICD_CFLAGS)
-libpocl_devices_rvex_la_LDFLAGS = --version-info ${LIB_VERSION}
+KERNEL_TARGET = rvex
+
+# Use TARGET flags:
+CLANG_FLAGS = @TARGET_CLANG_FLAGS@ -Xclang -ffake-address-space-map -emit-llvm -ffp-contract=off
+LLC_FLAGS   = @TARGET_LLC_FLAGS@
+LD_FLAGS    = @TARGET_LD_FLAGS@
+
+include ../rules.mk
+include ../sources.mk
 
 EXTRA_DIST = CMakeLists.txt

@@ -28,6 +28,7 @@
 #include "common.h"
 #include "utlist.h"
 #include "devices.h"
+#include "rvex_compile.h"
 
 #include <assert.h>
 #include <string.h>
@@ -785,10 +786,9 @@ static void check_compiler_cache (_cl_command_node *cmd)
   ci->next = NULL;
   ci->tmp_dir = strdup(cmd->command.run.tmp_dir);
   ci->function_name = strdup (cmd->command.run.kernel->function_name);
-  const char* module_fn = llvm_codegen (cmd->command.run.tmp_dir,
+  const char* module_fn = rvex_llvm_codegen (cmd->command.run.tmp_dir,
                                         cmd->command.run.kernel,
-                                        cmd->device,
-                                        0);
+                                        cmd->device);
   dlhandle = lt_dlopen (module_fn);
   if (dlhandle == NULL)
     {
