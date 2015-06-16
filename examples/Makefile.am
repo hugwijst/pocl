@@ -29,11 +29,11 @@
 # 'make check' is executed because they are not affected by pocl changes nor
 # should itself change.
 
-SUBDIRS = example1 example1-spir32 example1-spir64 example2 example2a trig \
+SUBDIRS = example1 example1-int example1-spir32 example1-spir64 example2 example2a trig \
 	scalarwave standalone opencl-book-samples VexCL ViennaCL Rodinia Parboil \
 	AMD AMDSDK2.9 EinsteinToolkit piglit Halide CloverLeaf
 
-BASIC_EXAMPLES = example1 example1-spir32 example1-spir64 example2 example2a trig \
+BASIC_EXAMPLES = example1 example1-int example1-spir32 example1-spir64 example2 example2a trig \
 	scalarwave standalone opencl-book-samples EinsteinToolkit
 
 EXTRA_DIST = CMakeLists.txt

@@ -48,6 +48,7 @@ set(ENABLED_TESTSUITES ${ENABLED_TESTSUITES} PARENT_SCOPE)
 
 
 add_subdirectory("example1")
+add_subdirectory("example1-int")
 add_subdirectory("example1-spir32")
 add_subdirectory("example1-spir64")
 add_subdirectory("example2")
