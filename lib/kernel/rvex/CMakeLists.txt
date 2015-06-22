@@ -48,3 +48,7 @@ add_custom_target("kernel_rvex" ALL DEPENDS ${KERNEL_BC})
 
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/${KERNEL_BC}"
         DESTINATION "${POCL_INSTALL_PRIVATE_DATADIR}")
+
+# install CPU configuration file for LLVM
+install(FILES "${CMAKE_SOURCE_DIR}/lib/kernel/rvex/rvex_W8"
+        DESTINATION "${POCL_INSTALL_PRIVATE_DATADIR}")

@@ -23,12 +23,16 @@
 */
 
 #include "rvex.h"
+
 #include "cpuinfo.h"
 #include "topology/pocl_topology.h"
 #include "common.h"
 #include "utlist.h"
 #include "devices.h"
 #include "rvex_compile.h"
+
+#include "pocl_runtime_config.h"
+#include "install-paths.h"
 
 #include <assert.h>
 #include <string.h>
@@ -195,6 +199,7 @@ pocl_rvex_init_device_ops(struct pocl_device_ops *ops)
   ops->device_name = "rvex";
 
   ops->init_device_infos = pocl_rvex_init_device_infos;
+  ops->init_build = pocl_rvex_init_build;
   ops->probe = pocl_rvex_probe;
   ops->uninit = pocl_rvex_uninit;
   ops->init = pocl_rvex_init;
@@ -295,6 +300,29 @@ pocl_rvex_init_device_infos(struct _cl_device_id* dev)
   dev->llvm_cpu = "rvex-vliw";
   dev->use_pic = CL_FALSE;
   dev->has_64bit_long = 0;
+}
+
+char *pocl_rvex_init_build(void *data, const char *tmpdir)
+{
+  static const char *conf_str = "-backend-option -config=%s%s/rvex_W8";
+  static const char *base_dir;
+  static const char *path;
+  int len;
+
+  if (pocl_get_bool_option("POCL_BUILDING", 0)) {
+    base_dir = SRCDIR;
+    path = "/lib/kernel/rvex";
+  } else {
+    base_dir = PKGDATADIR;
+    path = "";
+  }
+
+  len = snprintf(NULL, 0, conf_str, base_dir, path);
+
+  char *ret = malloc(len+1);
+  snprintf(ret, len+1, conf_str, base_dir, path);
+
+  return ret;
 }
 
 unsigned int
