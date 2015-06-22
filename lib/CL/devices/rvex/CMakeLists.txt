@@ -24,6 +24,6 @@
 #=============================================================================
 
 if(MSVC)
-  set_source_files_properties( rvex.h rvex.c PROPERTIES LANGUAGE CXX )
+  set_source_files_properties( rvex.h rvex.c rvex_compile.h rvex_compile.c PROPERTIES LANGUAGE CXX )
 endif(MSVC)
-add_library("pocl-devices-rvex" OBJECT rvex.h rvex.c)
+add_library("pocl-devices-rvex" OBJECT rvex.h rvex.c rvex_compile.h rvex_compile.c)
