@@ -1,24 +1,10 @@
 #define USE_VECTOR_DATATYPES
 
-constant char* constant str1 = "String 1";
-constant char* constant str2 = "String 2";
-
 __kernel void
 dot_product (__global const int4 *a,
         __global const int4 *b, __global int *c)
 {
   int gid = get_global_id(0);
-  constant char * str;
-
-  if (gid % 2) {
-    str = str1;
-  } else {
-    str = str2;
-  }
-
-  for (constant char * c = str; c != '\0'; c++) {
-    a[gid].x += *c;
-  }
 
 #ifndef USE_VECTOR_DATATYPES
   /* This version is to smoke test the autovectorization.
