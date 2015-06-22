@@ -293,6 +293,7 @@ pocl_rvex_init_device_infos(struct _cl_device_id* dev)
   dev->extensions = "";
   dev->llvm_target_triplet = "rvex";
   dev->llvm_cpu = "rvex-vliw";
+  dev->use_pic = CL_FALSE;
   dev->has_64bit_long = 0;
 }
 

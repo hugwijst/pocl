@@ -497,6 +497,9 @@ struct _cl_device_id {
   void *data;
   const char* llvm_target_triplet; /* the llvm target triplet to use */
   const char* llvm_cpu; /* the llvm CPU variant to use */
+  /* True of the code should be compiled as PIC, false if compiled
+     as static */
+  cl_bool use_pic;
   /* A running number (starting from zero) across all the device instances. Used for 
      indexing  arrays in data structures with device specific entries. */
   int dev_id;

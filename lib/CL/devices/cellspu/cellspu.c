@@ -125,6 +125,7 @@ pocl_cellspu_init_device_infos(struct _cl_device_id* dev)
   dev->extensions = "";
   dev->llvm_target_triplet = "cellspu-v0";
   dev->llvm_cpu = "cellspu";
+  dev->use_pic = CL_TRUE;
 }
 
 void

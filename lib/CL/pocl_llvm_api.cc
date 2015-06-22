@@ -898,9 +898,11 @@ static TargetMachine* GetTargetMachine(cl_device_id device,
     FeaturesStr = Features.getString();
   }
 
+  Reloc::Model RM = device->use_pic ? Reloc::PIC_ : Reloc::Static;
+
   return TheTarget->createTargetMachine(TheTriple.getTriple(),
                                         MCPU, FeaturesStr, GetTargetOptions(),
-                                        Reloc::PIC_, CodeModel::Default,
+                                        RM, CodeModel::Default,
                                         CodeGenOpt::Aggressive);
 }
 /* helpers copied from LLVM opt END */
