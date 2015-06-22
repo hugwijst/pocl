@@ -631,6 +631,7 @@ set(OCL_TARGETS "host")
 # THESE are only used in makefile.am & scripts/pocl*
 set(TCE_TARGET_CLANG_FLAGS "" CACHE STRING "Extra parameters to Clang for TCE compilation.")
 set(CELL_TARGET_CLANG_FLAGS "" CACHE STRING "Extra parameters to Clang for CELL compilation.")
+set(RVEX_TARGET_CLANG_FLAGS "--target=rvex -mllvm -config=${CMAKE_SOURCE_DIR}/lib/kernel/rvex/rvex_W8" CACHE STRING "Extra parameters to Clang for rVEX compilation.")
 # TODO HOST_CLANG_FLAGS -> CPU_TARGET_CLANG_FLAGS
 #set(HOST_CLANG_FLAGS "" CACHE STRING "Extra parameters to Clang for cpu target compilation.")
 #AC_ARG_VAR([TARGET_CLANG_FLAGS],
@@ -638,6 +639,7 @@ set(CELL_TARGET_CLANG_FLAGS "" CACHE STRING "Extra parameters to Clang for CELL 
 
 set(TCE_TARGET_LLC_FLAGS "" CACHE STRING "Extra parameters to LLVM's llc for TCE compilation.")
 set(CELL_TARGET_LLC_FLAGS "" CACHE STRING "Extra parameters to LLVM's llc for CELL compilation.")
+set(RVEX_TARGET_LLC_FLAGS "--march=rvex" CACHE STRING "Extra parameters to LLVM's llc for rVEX compilation.")
 # TODO HOST_LLC_FLAGS -> CPU_TARGET_LLC_FLAGS
 #set(HOST_LLC_FLAGS "" CACHE STRING "Extra parameters to LLVM's llc for cpu target compilation.")
 #AC_DEFINE_UNQUOTED([TARGET_LLC_FLAGS],
@@ -728,6 +730,29 @@ if(ENABLE_TCE)
   endif()
 else()
   set(ENABLE_TCEMC 0)
+endif()
+
+##########################################################
+
+# Check if rVEX support is found
+
+if(NOT DEFINED DEFAULT_ENABLE_RVEX)
+    set(_RVEX 0)
+
+    if(LLVM_ALL_TARGETS MATCHES "rvex")
+        set(_RVEX 1)
+    endif()
+
+    set(DEFAULT_ENABLE_RVEX ${_RVEX} CACHE INTERNAL "rVEX available")
+endif()
+
+setup_cached_var(ENABLE_RVEX "RVEX"
+  "Requested enabling rVEX, but no usable rVEX installation found !"
+  "rVEX is available, but requested disabling it")
+
+if(ENABLE_RVEX)
+  set(OCL_DRIVERS "${OCL_DRIVERS} rvex")
+  set(OCL_TARGETS "${OCL_TARGETS} rvex")
 endif()
 
 ##########################################################
@@ -1003,6 +1028,7 @@ MESSAGE(STATUS "DIRECT_LINKAGE: ${DIRECT_LINKAGE}")
 MESSAGE(STATUS "ENABLE_DOCS: ${ENABLE_DOCS}")
 MESSAGE(STATUS "ENABLE_ICD: ${ENABLE_ICD}")
 MESSAGE(STATUS "ENABLE_SPU (Cell SPU enabled): ${ENABLE_SPU}")
+MESSAGE(STATUS "ENABLE_RVEX: ${ENABLE_RVEX}")
 MESSAGE(STATUS "ENABLE_TCE: ${ENABLE_TCE}")
 MESSAGE(STATUS "ENABLE_TCEMC: ${ENABLE_TCEMC}")
 MESSAGE(STATUS "HAVE_CLOCK_GETTIME: ${HAVE_CLOCK_GETTIME}")
@@ -1084,6 +1110,8 @@ MESSAGE(STATUS "OCL_KERNEL_TARGET_CPU: ${OCL_KERNEL_TARGET_CPU}")
 MESSAGE(STATUS "POCL_DEVICE_ADDRESS_BITS: ${POCL_DEVICE_ADDRESS_BITS}")
 MESSAGE(STATUS "TCE_TARGET_CLANG_FLAGS: ${TCE_TARGET_CLANG_FLAGS}")
 MESSAGE(STATUS "TCE_TARGET_LLC_FLAGS: ${TCE_TARGET_LLC_FLAGS}")
+MESSAGE(STATUS "RVEX_TARGET_CLANG_FLAGS: ${RVEX_TARGET_CLANG_FLAGS}")
+MESSAGE(STATUS "RVEX_TARGET_LLC_FLAGS: ${RVEX_TARGET_LLC_FLAGS}")
 
 
 MESSAGE(STATUS " ")

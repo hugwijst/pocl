@@ -133,7 +133,7 @@ function(make_kernel_bc OUTPUT_VAR NAME)
     # straight parsing semicolon separated list with xargs -d didn't work on windows.. no such switch available
     SET(BC_LIST_FILE_TXT "${BC_LIST_FILE_TXT} \"${FILENAME}\"")
   endforeach()
-  SET (BC_LIST_FILE "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/kernel_linklist.txt")
+  SET (BC_LIST_FILE "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/kernel_${NAME}_linklist.txt")
   FILE (WRITE "${BC_LIST_FILE}" "${BC_LIST_FILE_TXT}")
 
   add_custom_command( OUTPUT "${KERNEL_BC}"
