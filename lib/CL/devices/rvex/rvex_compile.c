@@ -63,10 +63,18 @@ rvex_llvm_codegen (const char* tmpdir, cl_kernel kernel, cl_device_id device) {
                         "%s/%s", tmpdir, POCL_PARALLEL_BC_FILENAME);
       assert (error >= 0);
 
+      if (pocl_verbose) {
+        fprintf(stderr, "[pocl] generating assembly: %s -> %s\n", bytecode, asmfile);
+        fflush(stderr);
+      }
       error = pocl_llvm_codegen( kernel, device, bytecode, asmfile, 0);
       assert (error == 0);
 
       // assemble the file
+      if (pocl_verbose) {
+        fprintf(stderr, "[pocl] assembling files: %s, %s\n", objfile, asmfile);
+        fflush(stderr);
+      }
       error = snprintf (command, COMMAND_LENGTH,
             "rvex-elf32-as --issue 4 --config 337B --borrow 1.0.3,0.2,1 -o %s %s",
             objfile, asmfile);
