@@ -11,6 +11,7 @@
 #include "pocl_llvm.h"
 #include "pocl_runtime_config.h"
 #include "pocl_util.h"
+#include "install-paths.h"
 
 #define COMMAND_LENGTH 2048
 
@@ -32,10 +33,14 @@ rvex_llvm_codegen (const char* tmpdir, cl_kernel kernel, cl_device_id device) {
     pocl_get_string_option("POCL_VERBOSE", (char*)NULL);
   int pocl_verbose = pocl_verbose_ptr && *pocl_verbose_ptr;
 
+  static const char* const assembly_cmd = "rvex-elf32-as --issue 8 --config 3333337B --borrow 1.0.3.2.5.4.7.6 --defsym WG_FUNCTION=%s_workgroup -o %s %s";
+
   char command[COMMAND_LENGTH];
   char bytecode[POCL_FILENAME_LENGTH];
   char objfile[POCL_FILENAME_LENGTH];
   char asmfile[POCL_FILENAME_LENGTH];
+  char start_asmfile[POCL_FILENAME_LENGTH];
+  char start_objfile[POCL_FILENAME_LENGTH];
 
   char* module = (char*) malloc(min(POCL_FILENAME_LENGTH,
 	   strlen(tmpdir) + strlen(kernel->function_name) + 5)); // strlen of / .so 4+1
@@ -57,6 +62,18 @@ rvex_llvm_codegen (const char* tmpdir, cl_kernel kernel, cl_device_id device) {
      "%s/%s.so.s", tmpdir, kernel->function_name);
   assert (error >= 0);
 
+  if (pocl_get_bool_option("POCL_BUILDING", 0)) {
+    error = snprintf(start_asmfile, POCL_FILENAME_LENGTH, "%s/lib/CL/devices/rvex/_start.s",
+        SRCDIR);
+  } else {
+    error = snprintf(start_asmfile, POCL_FILENAME_LENGTH, "%s/_start.s",
+        PKGDATADIR);
+  }
+
+  error = snprintf
+    (start_objfile, POCL_FILENAME_LENGTH, "%s/_start.o", tmpdir);
+  assert (error >= 0);
+
   if (access (module, F_OK) != 0)
     {
       error = snprintf (bytecode, POCL_FILENAME_LENGTH,
@@ -76,8 +93,7 @@ rvex_llvm_codegen (const char* tmpdir, cl_kernel kernel, cl_device_id device) {
         fflush(stderr);
       }
       error = snprintf (command, COMMAND_LENGTH,
-            "rvex-elf32-as --issue 4 --config 337B --borrow 1.0.3,0.2,1 -o %s %s",
-            objfile, asmfile);
+            assembly_cmd, kernel->function_name, objfile, asmfile);
       assert (error >= 0);
 
       if (pocl_verbose) {
@@ -87,10 +103,22 @@ rvex_llvm_codegen (const char* tmpdir, cl_kernel kernel, cl_device_id device) {
       error = system (command);
       assert (error == 0);
 
+      // assemble _start.s
+      if (pocl_verbose) {
+        fprintf(stderr, "[pocl] assembling files: %s, %s\n", start_objfile, start_asmfile);
+        fflush(stderr);
+      }
+      error = snprintf (command, COMMAND_LENGTH,
+            assembly_cmd, kernel->function_name, start_objfile, start_asmfile);
+      assert (error >= 0);
+
+      error = system (command);
+      assert (error == 0);
+
       // clang is used as the linker driver in LINK_CMD
       error = snprintf (command, COMMAND_LENGTH,
-            "ld-elf2flt.sh -elf2flt -v -o %s %s",
-            module, objfile);
+            "rvex-elf32-ld -o %s %s %s",
+            module, start_objfile, objfile);
       assert (error >= 0);
 
       if (pocl_verbose) {

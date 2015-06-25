@@ -27,3 +27,5 @@ if(MSVC)
   set_source_files_properties( rvex.h rvex.c rvex_compile.h rvex_compile.c PROPERTIES LANGUAGE CXX )
 endif(MSVC)
 add_library("pocl-devices-rvex" OBJECT rvex.h rvex.c rvex_compile.h rvex_compile.c)
+
+install(FILES _start.s DESTINATION "${POCL_INSTALL_PRIVATE_DATADIR}")
