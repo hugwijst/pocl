@@ -1,7 +1,8 @@
-/* rvex.c - a minimalistic pocl device driver layer implementation
+/* rvex.c - a pocl device driver layer implementation for the rVEX softcore
 
    Copyright (c) 2011-2013 Universidad Rey Juan Carlos and
                  2011-2014 Pekka Jääskeläinen / Tampere University of Technology
+                 2015 Hugo van der Wijst / Delft University of Technology
    
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -24,20 +25,20 @@
 
 #include "rvex.h"
 
-#include "cpuinfo.h"
-#include "topology/pocl_topology.h"
+#include "bufalloc.h"
 #include "common.h"
-#include "utlist.h"
+#include "cpuinfo.h"
 #include "devices.h"
-#include "rvex_compile.h"
-
-#include "pocl_runtime_config.h"
 #include "install-paths.h"
+#include "pocl_runtime_config.h"
+#include "rvex_compile.h"
+#include "utlist.h"
+
+#include "topology/pocl_topology.h"
 
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
-#include <dev_image.h>
 
 #ifndef _MSC_VER
 #  include <sys/time.h>
@@ -56,6 +57,8 @@ struct data {
   cl_kernel current_kernel;
   /* Loaded kernel dynamic library handle. */
   lt_dlhandle current_dlhandle;
+  /* Memory allocation bookkeeping information */
+  struct memory_region memory;
 };
 
 static const cl_image_format supported_image_formats[] = {
@@ -255,7 +258,7 @@ pocl_rvex_init_device_infos(struct _cl_device_id* dev)
   dev->native_vector_width_double = POCL_DEVICES_PREFERRED_VECTOR_WIDTH_DOUBLE;
   dev->native_vector_width_half = POCL_DEVICES_PREFERRED_VECTOR_WIDTH_HALF;
   dev->max_clock_frequency = 0;
-  dev->address_bits = POCL_DEVICE_ADDRESS_BITS;
+  dev->address_bits = 32; /* rVEX has 32 bit pointers */
 
   /* Use the minimum values until we get a more sensible
      upper limit from somewhere. */
@@ -282,7 +285,7 @@ pocl_rvex_init_device_infos(struct _cl_device_id* dev)
   dev->local_mem_type = CL_GLOBAL;
   dev->local_mem_size = 0;
   dev->error_correction_support = CL_FALSE;
-  dev->host_unified_memory = CL_TRUE;
+  dev->host_unified_memory = CL_FALSE;
   dev->profiling_timer_resolution = 0;
   dev->endian_little = CL_FALSE;
   dev->available = CL_TRUE;
@@ -355,6 +358,8 @@ pocl_rvex_init (cl_device_id device, const char* parameters)
   
   d->current_kernel = NULL;
   d->current_dlhandle = 0;
+  // The ML605 has 512 MBytes of RAM, starting at address 0
+  init_mem_region(&d->memory, 0, 512*1024*1024);
   device->data = d;
   pocl_topology_detect_device_info(device);
   pocl_cpuinfo_detect_device_info(device);
@@ -374,62 +379,36 @@ pocl_rvex_init (cl_device_id device, const char* parameters)
   #endif
 }
 
-void *
-pocl_rvex_malloc (void *device_data, cl_mem_flags flags,
-		    size_t size, void *host_ptr)
-{
-  void *b;
-
-  if (flags & CL_MEM_COPY_HOST_PTR)
-    {
-      b = pocl_memalign_alloc(MAX_EXTENDED_ALIGNMENT, size);
-      if (b != NULL)
-        {
-          memcpy(b, host_ptr, size);
-          return b;
-        }
-      
-      return NULL;
-    }
-  
-  if (flags & CL_MEM_USE_HOST_PTR && host_ptr != NULL)
-    {
-      return host_ptr;
-    }
-  b = pocl_memalign_alloc(MAX_EXTENDED_ALIGNMENT, size);
-  if (b != NULL)
-    return b;
-  
-  return NULL;
-}
-
 cl_int
 pocl_rvex_alloc_mem_obj (cl_device_id device, cl_mem mem_obj)
 {
   void *b = NULL;
+  struct data* data = (struct data*)device->data;
   cl_int flags = mem_obj->flags;
+  pocl_mem_identifier *dev_ptrs = &mem_obj->device_ptrs[device->global_mem_id];
+
+  assert(! (flags & CL_MEM_USE_HOST_PTR && flags & CL_MEM_COPY_HOST_PTR)
+      && "USE_HOST_PTR and COPY_HOST_PTR are both set");
+
+  assert(mem_obj->mem_host_ptr == NULL
+      && (flags & CL_MEM_USE_HOST_PTR || CL_MEM_COPY_HOST_PTR)
+      && "mem_host_ptr should not be NULL");
 
   /* if memory for this global memory is not yet allocated -> do it */
-  if (mem_obj->device_ptrs[device->global_mem_id].mem_ptr == NULL)
-    {
-      if (flags & CL_MEM_USE_HOST_PTR && mem_obj->mem_host_ptr != NULL)
-        {
-          b = mem_obj->mem_host_ptr;
-        }
-      else
-        {
-          b = pocl_memalign_alloc(MAX_EXTENDED_ALIGNMENT, mem_obj->size);
-          if (b == NULL)
-            return CL_MEM_OBJECT_ALLOCATION_FAILURE;
-        }
-
-      if (flags & CL_MEM_COPY_HOST_PTR)
-        memcpy (b, mem_obj->mem_host_ptr, mem_obj->size);
-    
-      mem_obj->device_ptrs[device->global_mem_id].mem_ptr = b;
-      mem_obj->device_ptrs[device->global_mem_id].global_mem_id = 
-        device->global_mem_id;
+  if (dev_ptrs->mem_ptr == NULL) {
+    chunk_info_t *chunk = alloc_buffer(&data->memory, mem_obj->size);
+    if(chunk == NULL) {
+      return CL_MEM_OBJECT_ALLOCATION_FAILURE;
     }
+
+    dev_ptrs->mem_ptr = chunk;
+    dev_ptrs->global_mem_id = device->global_mem_id;
+
+    if (flags & CL_MEM_USE_HOST_PTR || flags & CL_MEM_COPY_HOST_PTR) {
+      pocl_rvex_write(data, mem_obj->mem_host_ptr, (void*)chunk->start_address,
+          mem_obj->size);
+    }
+  }
   /* copy already allocated global mem info to devices own slot */
   mem_obj->device_ptrs[device->dev_id] = 
     mem_obj->device_ptrs[device->global_mem_id];
@@ -440,30 +419,66 @@ pocl_rvex_alloc_mem_obj (cl_device_id device, cl_mem mem_obj)
 void
 pocl_rvex_free (void *data, cl_mem_flags flags, void *ptr)
 {
-  if (flags & CL_MEM_USE_HOST_PTR)
-    return;
-  
-  POCL_MEM_FREE(ptr);
+  /* CL_MEM_USE_HOST_PTR objects have their data copied to them after execution
+     of the kernel */
+  free_chunk((chunk_info_t *)ptr);
 }
 
 void
 pocl_rvex_read (void *data, void *host_ptr, const void *device_ptr, size_t cb)
 {
-  if (host_ptr == device_ptr)
-    return;
+  int res;
 
-  memcpy (host_ptr, device_ptr, cb);
+  FILE *f = fopen("/dev/rvex0", "r");
+  if (f == NULL) {
+    fprintf(stderr, "Couldn't open /dev/rvex0!\n");
+    return;
+  }
+
+  res = fseek(f, (size_t)device_ptr, SEEK_SET);
+  if (res != 0) {
+    fclose(f);
+    return;
+  }
+
+  res = fread(host_ptr, cb, 1, f);
+  fclose(f);
+
+  if (res != 1) {
+    fprintf(stderr, "Reading from device failed (addr: %u, size: %zu)!\n",
+        (uint32_t) device_ptr, cb);
+  }
 }
 
 void
 pocl_rvex_write (void *data, const void *host_ptr, void *device_ptr, size_t cb)
 {
-  if (host_ptr == device_ptr)
-    return;
+  int res;
 
-  memcpy (device_ptr, host_ptr, cb);
+  FILE *f = fopen("/dev/rvex0", "r+");
+  if (f == NULL) {
+    fprintf(stderr, "Couldn't open /dev/rvex0!\n");
+    return;
+  }
+
+  res = fseek(f, (size_t)device_ptr, SEEK_SET);
+  if (res != 0) {
+    fclose(f);
+    return;
+  }
+
+  res = fwrite(host_ptr, cb, 1, f);
+  fclose(f);
+
+  if (res != 1) {
+    fprintf(stderr, "Writing to device failed (addr: %u, size: %zu)!\n",
+        (uint32_t) device_ptr, cb);
+  }
 }
 
+inline size_t align_size(size_t s, size_t psize) {
+  return (s + psize - 1) / psize * psize;
+}
 
 void
 pocl_rvex_run 
@@ -471,78 +486,124 @@ pocl_rvex_run
  _cl_command_node* cmd)
 {
   struct data *d;
-  struct pocl_argument *al;
   size_t x, y, z;
   unsigned i;
   cl_kernel kernel = cmd->command.run.kernel;
   struct pocl_context *pc = &cmd->command.run.pc;
+  /* rVEX has 4 byte pointers */
+  const size_t psize = 4;
 
   assert (data != NULL);
   d = (struct data *) data;
 
   d->current_kernel = kernel;
 
-  void **arguments = (void**)malloc(
-      sizeof(void*) * (kernel->num_args + kernel->num_locals)
-    );
+  /* Determine the amount of memory needed for all argument data */
+  size_t alloc_size = 0;
+  /* The initial argument pointers */
+  size_t arg_list_size = psize * (kernel->num_args + kernel->num_locals);
+  alloc_size += arg_list_size;
+  /* Data needed for kernel arguments */
+  for (i = 0; i < kernel->num_args; ++i) {
+    struct pocl_argument *al = &(cmd->command.run.arguments[i]);
+    if (kernel->arg_info[i].is_local) {
+      alloc_size += align_size(al->size, psize);
+    } else {
+      switch (kernel->arg_info[i].type) {
+        case POCL_ARG_TYPE_POINTER:
+          /* The buffer should either be local and handled above, or should
+             already be transfered. */
+          break;
+        case POCL_ARG_TYPE_IMAGE:
+          alloc_size += align_size(sizeof(dev_image_t), psize);
+          break;
+        case POCL_ARG_TYPE_SAMPLER:
+          alloc_size += align_size(sizeof(dev_sampler_t), psize);
+          break;
+        case POCL_ARG_TYPE_NONE:
+          alloc_size += align_size(al->size, psize);
+          break;
+      }
+    }
+  }
+  /* Data needed for non-argument locals */
+  for (i = 0; i < kernel->num_locals; ++i) {
+    struct pocl_argument *al = &(cmd->command.run.arguments[i]);
+
+    alloc_size += align_size(al->size, psize);
+  }
+
+  /* Allocate total argument data memory */
+  uint8_t *arguments = malloc(alloc_size);
+  chunk_info_t *arguments_dev = alloc_buffer(&d->memory, alloc_size);
+
+  /* The arguments array is located at the beginning of the arg_data array */
+  uint32_t *arg_list = (uint32_t*)&arguments[0];
+  uint8_t *arg_data = &arguments[arg_list_size];
+  uint32_t p_arg_data_dev = arguments_dev->start_address + arg_list_size;
 
   /* Process the kernel arguments. Convert the opaque buffer
      pointers to real device pointers, allocate dynamic local 
      memory buffers, etc. */
-  for (i = 0; i < kernel->num_args; ++i)
-    {
-      al = &(cmd->command.run.arguments[i]);
-      if (kernel->arg_info[i].is_local)
-        {
-          arguments[i] = malloc (sizeof (void *));
-          *(void **)(arguments[i]) = pocl_rvex_malloc(data, 0, al->size, NULL);
-        }
-      else if (kernel->arg_info[i].type == POCL_ARG_TYPE_POINTER)
-        {
-          /* It's legal to pass a NULL pointer to clSetKernelArguments. In 
-             that case we must pass the same NULL forward to the kernel.
-             Otherwise, the user must have created a buffer with per device
-             pointers stored in the cl_mem. */
-          if (al->value == NULL)
-            {
-              arguments[i] = malloc (sizeof (void *));
-              *(void **)arguments[i] = NULL;
-            }
-          else
-            arguments[i] = &((*(cl_mem *) (al->value))->device_ptrs[cmd->device->dev_id].mem_ptr);
-        }
-      else if (kernel->arg_info[i].type == POCL_ARG_TYPE_IMAGE)
-        {
-          dev_image_t di;
-          fill_dev_image_t (&di, al, cmd->device);
+  for (i = 0; i < kernel->num_args; ++i) {
+    struct pocl_argument *al = &(cmd->command.run.arguments[i]);
 
-          void* devptr = pocl_rvex_malloc (data, 0, sizeof(dev_image_t), NULL);
-          arguments[i] = malloc (sizeof (void *));
-          *(void **)(arguments[i]) = devptr; 
-          pocl_rvex_write (data, &di, devptr, sizeof(dev_image_t));
-        }
-      else if (kernel->arg_info[i].type == POCL_ARG_TYPE_SAMPLER)
-        {
-          dev_sampler_t ds;
-          
-          arguments[i] = malloc (sizeof (void *));
-          *(void **)(arguments[i]) = pocl_rvex_malloc 
-            (data, 0, sizeof(dev_sampler_t), NULL);
-          pocl_rvex_write (data, &ds, *(void**)arguments[i], sizeof(dev_sampler_t));
-        }
-      else
-        {
-          arguments[i] = al->value;
-        }
+    if (kernel->arg_info[i].is_local) {
+      arg_list[i] = p_arg_data_dev;
+      p_arg_data_dev += align_size(al->size, psize);
+
+    } else if (kernel->arg_info[i].type == POCL_ARG_TYPE_POINTER) {
+      /* It's legal to pass a NULL pointer to clSetKernelArguments. In
+         that case we must pass the same NULL forward to the kernel.
+         Otherwise, the user must have created a buffer with per device
+         pointers stored in the cl_mem. */
+      if (al->value == NULL)
+        arg_list[i] = 0;
+      else {
+        cl_mem_t *mem = *(cl_mem_t **) al->value;
+        /* rVEX addresses are 32-bit */
+        arg_list[i] = (uint32_t) mem->device_ptrs[cmd->device->dev_id].mem_ptr;
+      }
+
+    } else if (kernel->arg_info[i].type == POCL_ARG_TYPE_IMAGE) {
+      const size_t SIZE = sizeof(dev_image_t);
+      dev_image_t di;
+      fill_dev_image_t (&di, al, cmd->device);
+
+      memcpy(arg_data, &di, SIZE);
+      arg_list[i] = p_arg_data_dev;
+
+      arg_data += align_size(SIZE, psize);
+      p_arg_data_dev += align_size(SIZE, psize);
+
+    } else if (kernel->arg_info[i].type == POCL_ARG_TYPE_SAMPLER) {
+      const size_t SIZE = sizeof(dev_sampler_t);
+      dev_sampler_t ds;
+      fill_dev_sampler_t (&ds, al);
+
+      memcpy(arg_data, &ds, SIZE);
+      arg_list[i] = p_arg_data_dev;
+
+      arg_data += align_size(SIZE, psize);
+      p_arg_data_dev += align_size(SIZE, psize);
+
+    } else {
+      memcpy(arg_data, al->value, al->size);
+      arg_list[i] = p_arg_data_dev;
+
+      arg_data += align_size(al->size, psize);
+      p_arg_data_dev += align_size(al->size, psize);
     }
-  for (i = kernel->num_args;
-       i < kernel->num_args + kernel->num_locals;
-       ++i)
-    {
-      al = &(cmd->command.run.arguments[i]);
-      arguments[i] = malloc (sizeof (void *));
-      *(void **)(arguments[i]) = pocl_rvex_malloc (data, 0, al->size, NULL);
-    }
+  }
+  for (i = kernel->num_args; i < kernel->num_args + kernel->num_locals; ++i) {
+    struct pocl_argument *al = &(cmd->command.run.arguments[i]);
+
+    arg_list[i] = p_arg_data_dev;
+    p_arg_data_dev += align_size(al->size, psize);
+  }
+
+  /* Write argument data to rvex */
+  pocl_rvex_write(data, arguments, arguments_dev, alloc_size);
 
   for (z = 0; z < pc->num_groups[2]; ++z)
     {
@@ -555,37 +616,31 @@ pocl_rvex_run
               pc->group_id[2] = z;
 
 #if 0
-              cmd->command.run.wg (arguments, pc);
+              cmd->command.run.wg (arg_list, pc);
 #endif
 
             }
         }
     }
-  for (i = 0; i < kernel->num_args; ++i)
-    {
-      if (kernel->arg_info[i].is_local)
-        {
-          pocl_rvex_free (data, 0, *(void **)(arguments[i]));
-          POCL_MEM_FREE(arguments[i]);
+
+  /* Copy CL_MEM_USE_HOST_PTR argument data back to the host */
+  for (i = 0; i < kernel->num_args; ++i) {
+    if (kernel->arg_info[i].type == POCL_ARG_TYPE_POINTER) {
+      struct pocl_argument *al = &(cmd->command.run.arguments[i]);
+      /* It is legal to pass NULL */
+      if (al->value != NULL) {
+        cl_mem_t *mem = *(cl_mem_t **) al->value;
+
+        if(mem->flags & CL_MEM_USE_HOST_PTR) {
+          void* mem_dev_ptr = mem->device_ptrs[cmd->device->dev_id].mem_ptr;
+          pocl_rvex_read(data, mem->mem_host_ptr, mem_dev_ptr, mem->size);
         }
-      else if (kernel->arg_info[i].type == POCL_ARG_TYPE_IMAGE)
-        {
-          pocl_rvex_free (data, 0, *(void **)(arguments[i]));
-          POCL_MEM_FREE(arguments[i]);
-        }
-      else if (kernel->arg_info[i].type == POCL_ARG_TYPE_SAMPLER || 
-               (kernel->arg_info[i].type == POCL_ARG_TYPE_POINTER && *(void**)arguments[i] == NULL))
-        {
-          POCL_MEM_FREE(arguments[i]);
-        }
+      }
     }
-  for (i = kernel->num_args;
-       i < kernel->num_args + kernel->num_locals;
-       ++i)
-    {
-      pocl_rvex_free(data, 0, *(void **)(arguments[i]));
-      POCL_MEM_FREE(arguments[i]);
-    }
+  }
+
+  /* Free allocated memory */
+  free_chunk(arguments_dev);
   free(arguments);
 }
 
@@ -818,6 +873,8 @@ static void check_compiler_cache (_cl_command_node *cmd)
   const char* module_fn = rvex_llvm_codegen (cmd->command.run.tmp_dir,
                                         cmd->command.run.kernel,
                                         cmd->device);
+#if 0
+  /* TODO: load correct workgroup info in structures */
   dlhandle = lt_dlopen (module_fn);
   if (dlhandle == NULL)
     {
@@ -831,6 +888,7 @@ static void check_compiler_cache (_cl_command_node *cmd)
             "_%s_workgroup", cmd->command.run.kernel->function_name);
   cmd->command.run.wg = ci->wg = 
     (pocl_workgroup) lt_dlsym (dlhandle, workgroup_string);
+#endif
 
   LL_APPEND (compiler_cache, ci);
   POCL_UNLOCK (compiler_cache_lock);
