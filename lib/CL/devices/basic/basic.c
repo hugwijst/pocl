@@ -32,7 +32,6 @@
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
-#include <dev_image.h>
 
 #ifndef _MSC_VER
 #  include <sys/time.h>
@@ -436,21 +435,23 @@ pocl_basic_free (void *data, cl_mem_flags flags, void *ptr)
 }
 
 void
-pocl_basic_read (void *data, void *host_ptr, const void *device_ptr, size_t cb)
+pocl_basic_read (void *data, void *host_ptr, const void *device_ptr, 
+                 size_t offset, size_t cb)
 {
   if (host_ptr == device_ptr)
     return;
 
-  memcpy (host_ptr, device_ptr, cb);
+  memcpy (host_ptr, device_ptr + offset, cb);
 }
 
 void
-pocl_basic_write (void *data, const void *host_ptr, void *device_ptr, size_t cb)
+pocl_basic_write (void *data, const void *host_ptr, void *device_ptr, 
+                  size_t offset, size_t cb)
 {
   if (host_ptr == device_ptr)
     return;
 
-  memcpy (device_ptr, host_ptr, cb);
+  memcpy (device_ptr + offset, host_ptr, cb);
 }
 
 
@@ -508,16 +509,18 @@ pocl_basic_run
           void* devptr = pocl_basic_malloc (data, 0, sizeof(dev_image_t), NULL);
           arguments[i] = malloc (sizeof (void *));
           *(void **)(arguments[i]) = devptr; 
-          pocl_basic_write (data, &di, devptr, sizeof(dev_image_t));
+          pocl_basic_write (data, &di, devptr, 0, sizeof(dev_image_t));
         }
       else if (kernel->arg_info[i].type == POCL_ARG_TYPE_SAMPLER)
         {
           dev_sampler_t ds;
+          fill_dev_sampler_t(&ds, al);
           
           arguments[i] = malloc (sizeof (void *));
           *(void **)(arguments[i]) = pocl_basic_malloc 
             (data, 0, sizeof(dev_sampler_t), NULL);
-          pocl_basic_write (data, &ds, *(void**)arguments[i], sizeof(dev_sampler_t));
+          pocl_basic_write (data, &ds, *(void**)arguments[i], 0, 
+                            sizeof(dev_sampler_t));
         }
       else
         {
@@ -585,12 +588,13 @@ pocl_basic_run_native
 }
 
 void
-pocl_basic_copy (void *data, const void *src_ptr, void *__restrict__ dst_ptr, size_t cb)
+pocl_basic_copy (void *data, const void *src_ptr, size_t src_offset, 
+                 void *__restrict__ dst_ptr, size_t dst_offset, size_t cb)
 {
   if (src_ptr == dst_ptr)
     return;
   
-  memcpy (dst_ptr, src_ptr, cb);
+  memcpy (dst_ptr + dst_offset, src_ptr + src_offset, cb);
 }
 
 void
@@ -667,11 +671,11 @@ pocl_basic_read_rect (void *data,
 {
   char const *__restrict const adjusted_device_ptr = 
     (char const*)device_ptr +
-      buffer_origin[2] * buffer_slice_pitch + buffer_origin[1] * buffer_row_pitch + buffer_origin[0];
+    buffer_origin[2] * buffer_slice_pitch + buffer_origin[1] * buffer_row_pitch + buffer_origin[0];
   char *__restrict__ const adjusted_host_ptr = 
     (char*)host_ptr +
-      host_origin[2] * host_slice_pitch + host_origin[1] * host_row_pitch + host_origin[0];
-
+    host_origin[2] * host_slice_pitch + host_origin[1] * host_row_pitch + host_origin[0];
+  
   size_t j, k;
   
   /* TODO: handle overlaping regions */

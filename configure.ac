@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 # 
 # Copyright (c) 2011-2013 Universidad Rey Juan Carlos and
-#               2011-2014 Pekka Jääskeläinen / Tampere University of Technology
+#               2011-2015 Pekka Jääskeläinen / Tampere University of Technology
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -91,6 +91,7 @@ NEW_PRINTF_WORKS=true
 LLVM_3_6=false
 
 AC_SUBST([LLVM_VERSION], [$LLVM_VERSION])
+AC_DEFINE_UNQUOTED([LLVM_VERSION], ["$LLVM_VERSION"], "LLVM version as a string.")
 
 case "$LLVM_VERSION" in
      3.2*)
@@ -1340,7 +1341,11 @@ CPPFLAGS="$old_CPPFLAGS"
 CFLAGS="$old_CFLAGS"
 LDFLAGS="$old_LDFLAGS"
 
-AC_C_BIGENDIAN
+AC_C_BIGENDIAN(
+  [ AC_DEFINE([WORDS_BIGENDIAN], [1], [Endianness]) ],
+  [ AC_DEFINE([WORDS_BIGENDIAN], [0], [Endianness]) ]
+)
+
 
 # The libtool library version string to use (passed to -version-info).
 # See: http://www.nondot.org/sabre/Mirrored/libtool-2.1a/libtool_6.html

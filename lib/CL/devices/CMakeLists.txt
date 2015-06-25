@@ -37,7 +37,9 @@ set(POCL_DEVICES_OBJS "$<TARGET_OBJECTS:pocl-devices>"
 
 if(ENABLE_TCE)
   add_subdirectory("tce")
+  include_directories(AFTER "tce")
   list(APPEND POCL_DEVICES_LINK_LIST ${TCE_LIBS})
+  list(APPEND POCL_DEVICES_OBJS "$<TARGET_OBJECTS:pocl-devices-tce-ttasim>")
 endif()
 
 if(ENABLE_SPU)
@@ -47,7 +49,7 @@ endif()
 
 set(POCL_DEVICES_SOURCES 
   devices.h  devices.c
-  bufalloc.c  dev_image.h
+  bufalloc.c
   common.h common.c
   bufalloc.h  cpuinfo.c cpuinfo.h)
 
