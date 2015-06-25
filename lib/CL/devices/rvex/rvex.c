@@ -406,7 +406,7 @@ pocl_rvex_alloc_mem_obj (cl_device_id device, cl_mem mem_obj)
 
     if (flags & CL_MEM_USE_HOST_PTR || flags & CL_MEM_COPY_HOST_PTR) {
       pocl_rvex_write(data, mem_obj->mem_host_ptr, (void*)chunk->start_address,
-          mem_obj->size);
+          0, mem_obj->size);
     }
   }
   /* copy already allocated global mem info to devices own slot */
@@ -425,7 +425,8 @@ pocl_rvex_free (void *data, cl_mem_flags flags, void *ptr)
 }
 
 void
-pocl_rvex_read (void *data, void *host_ptr, const void *device_ptr, size_t cb)
+pocl_rvex_read (void *data, void *host_ptr, const void *device_ptr,
+    size_t offset, size_t cb)
 {
   int res;
 
@@ -435,7 +436,7 @@ pocl_rvex_read (void *data, void *host_ptr, const void *device_ptr, size_t cb)
     return;
   }
 
-  res = fseek(f, (size_t)device_ptr, SEEK_SET);
+  res = fseek(f, (size_t)device_ptr + offset, SEEK_SET);
   if (res != 0) {
     fclose(f);
     return;
@@ -451,7 +452,8 @@ pocl_rvex_read (void *data, void *host_ptr, const void *device_ptr, size_t cb)
 }
 
 void
-pocl_rvex_write (void *data, const void *host_ptr, void *device_ptr, size_t cb)
+pocl_rvex_write (void *data, const void *host_ptr, void *device_ptr,
+    size_t offset, size_t cb)
 {
   int res;
 
@@ -461,7 +463,7 @@ pocl_rvex_write (void *data, const void *host_ptr, void *device_ptr, size_t cb)
     return;
   }
 
-  res = fseek(f, (size_t)device_ptr, SEEK_SET);
+  res = fseek(f, (size_t)device_ptr + offset, SEEK_SET);
   if (res != 0) {
     fclose(f);
     return;
@@ -603,7 +605,7 @@ pocl_rvex_run
   }
 
   /* Write argument data to rvex */
-  pocl_rvex_write(data, arguments, arguments_dev, alloc_size);
+  pocl_rvex_write(data, arguments, arguments_dev, 0, alloc_size);
 
   for (z = 0; z < pc->num_groups[2]; ++z)
     {
@@ -633,7 +635,7 @@ pocl_rvex_run
 
         if(mem->flags & CL_MEM_USE_HOST_PTR) {
           void* mem_dev_ptr = mem->device_ptrs[cmd->device->dev_id].mem_ptr;
-          pocl_rvex_read(data, mem->mem_host_ptr, mem_dev_ptr, mem->size);
+          pocl_rvex_read(data, mem->mem_host_ptr, mem_dev_ptr, 0, mem->size);
         }
       }
     }
@@ -655,7 +657,8 @@ pocl_rvex_run_native
 }
 
 void
-pocl_rvex_copy (void *data, const void *src_ptr, void *__restrict__ dst_ptr, size_t cb)
+pocl_rvex_copy (void *data, const void *src_ptr, size_t src_offset,
+    void *__restrict__ dst_ptr, size_t dst_offset, size_t cb)
 {
   if (src_ptr == dst_ptr)
     return;
