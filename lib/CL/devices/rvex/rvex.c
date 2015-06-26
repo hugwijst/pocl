@@ -660,10 +660,7 @@ void
 pocl_rvex_copy (void *data, const void *src_ptr, size_t src_offset,
     void *__restrict__ dst_ptr, size_t dst_offset, size_t cb)
 {
-  if (src_ptr == dst_ptr)
-    return;
-  
-  memcpy (dst_ptr, src_ptr, cb);
+  /* Not yet implemented */
 }
 
 void
@@ -678,6 +675,7 @@ pocl_rvex_copy_rect (void *data,
                       size_t const dst_row_pitch,
                       size_t const dst_slice_pitch)
 {
+  /* Not yet implemented */
   char const *__restrict const adjusted_src_ptr = 
     (char const*)src_ptr +
     src_origin[0] + src_row_pitch * src_origin[1] + src_slice_pitch * src_origin[2];
@@ -689,11 +687,13 @@ pocl_rvex_copy_rect (void *data,
 
   /* TODO: handle overlaping regions */
   
+#if 0
   for (k = 0; k < region[2]; ++k)
     for (j = 0; j < region[1]; ++j)
       memcpy (adjusted_dst_ptr + dst_row_pitch * j + dst_slice_pitch * k,
               adjusted_src_ptr + src_row_pitch * j + src_slice_pitch * k,
               region[0]);
+#endif
 }
 
 void
@@ -708,6 +708,7 @@ pocl_rvex_write_rect (void *data,
                        size_t const host_row_pitch,
                        size_t const host_slice_pitch)
 {
+  /* Not yet implemented */
   char *__restrict const adjusted_device_ptr = 
     (char*)device_ptr +
     buffer_origin[0] + buffer_row_pitch * buffer_origin[1] + buffer_slice_pitch * buffer_origin[2];
@@ -719,11 +720,13 @@ pocl_rvex_write_rect (void *data,
 
   /* TODO: handle overlaping regions */
   
+#if 0
   for (k = 0; k < region[2]; ++k)
     for (j = 0; j < region[1]; ++j)
       memcpy (adjusted_device_ptr + buffer_row_pitch * j + buffer_slice_pitch * k,
               adjusted_host_ptr + host_row_pitch * j + host_slice_pitch * k,
               region[0]);
+#endif
 }
 
 void
@@ -738,6 +741,7 @@ pocl_rvex_read_rect (void *data,
                       size_t const host_row_pitch,
                       size_t const host_slice_pitch)
 {
+  /* Not yet implemnted */
   char const *__restrict const adjusted_device_ptr = 
     (char const*)device_ptr +
       buffer_origin[2] * buffer_slice_pitch + buffer_origin[1] * buffer_row_pitch + buffer_origin[0];
@@ -749,11 +753,13 @@ pocl_rvex_read_rect (void *data,
   
   /* TODO: handle overlaping regions */
   
+#if 0
   for (k = 0; k < region[2]; ++k)
     for (j = 0; j < region[1]; ++j)
       memcpy (adjusted_host_ptr + host_row_pitch * j + host_slice_pitch * k,
               adjusted_device_ptr + buffer_row_pitch * j + buffer_slice_pitch * k,
               region[0]);
+#endif
 }
 
 /* origin and region must be in original shape unlike in copy/read/write_rect()
@@ -768,6 +774,7 @@ pocl_rvex_fill_rect (void *data,
                       void *fill_pixel,
                       size_t pixel_size)                    
 {
+  /* Not yet implemented */
   char *__restrict const adjusted_device_ptr = (char*)device_ptr 
     + buffer_origin[0] * pixel_size 
     + buffer_row_pitch * buffer_origin[1] 
@@ -775,12 +782,14 @@ pocl_rvex_fill_rect (void *data,
     
   size_t i, j, k;
 
+#if 0
   for (k = 0; k < region[2]; ++k)
     for (j = 0; j < region[1]; ++j)
       for (i = 0; i < region[0]; ++i)
         memcpy (adjusted_device_ptr + pixel_size * i 
                 + buffer_row_pitch * j 
                 + buffer_slice_pitch * k, fill_pixel, pixel_size);
+#endif
 }
 
 void *
@@ -788,10 +797,15 @@ pocl_rvex_map_mem (void *data, void *buf_ptr,
                       size_t offset, size_t size,
                       void *host_ptr) 
 {
+  /* Not yet implemented */
+
+#if 0
   /* All global pointers of the pthread/CPU device are in 
      the host address space already, and up to date. */
   if (host_ptr != NULL) return host_ptr;
   return (char*)buf_ptr + offset;
+#endif
+  return NULL;
 }
 
 void
@@ -805,6 +819,7 @@ pocl_rvex_uninit (cl_device_id device)
 cl_ulong
 pocl_rvex_get_timer_value (void *data) 
 {
+  /* Not yet implemented */
 #ifndef _MSC_VER
   struct timeval current;
   gettimeofday(&current, NULL);  
