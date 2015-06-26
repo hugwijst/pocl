@@ -390,8 +390,8 @@ pocl_rvex_alloc_mem_obj (cl_device_id device, cl_mem mem_obj)
   assert(! (flags & CL_MEM_USE_HOST_PTR && flags & CL_MEM_COPY_HOST_PTR)
       && "USE_HOST_PTR and COPY_HOST_PTR are both set");
 
-  assert(mem_obj->mem_host_ptr == NULL
-      && (flags & CL_MEM_USE_HOST_PTR || CL_MEM_COPY_HOST_PTR)
+  assert(! (mem_obj->mem_host_ptr == NULL
+      && (flags & CL_MEM_USE_HOST_PTR || flags & CL_MEM_COPY_HOST_PTR))
       && "mem_host_ptr should not be NULL");
 
   /* if memory for this global memory is not yet allocated -> do it */
