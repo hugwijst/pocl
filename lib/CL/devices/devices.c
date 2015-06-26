@@ -240,7 +240,7 @@ pocl_init_devices()
              a shared global memory. */
           pocl_devices[dev_index].global_mem_id = dev_index;
           
-          pocl_device_ops[i].init_device_infos(&pocl_devices[dev_index]);
+          pocl_device_ops[i].init_device_infos(&pocl_devices[dev_index], j);
 
           pocl_device_common_init(&pocl_devices[dev_index]);
 
@@ -250,7 +250,7 @@ pocl_init_devices()
           if (snprintf (env_name, 1024, "POCL_%s%d_PARAMETERS", dev_name, j) < 0)
             POCL_ABORT("Unable to generate the env string.");
 
-          pocl_devices[dev_index].ops->init(&pocl_devices[dev_index], getenv(env_name));
+          pocl_devices[dev_index].ops->init(&pocl_devices[dev_index], j, getenv(env_name));
 
           if (dev_index == 0)
             pocl_devices[dev_index].type |= CL_DEVICE_TYPE_DEFAULT;

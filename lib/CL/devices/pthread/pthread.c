@@ -193,9 +193,9 @@ pocl_pthread_probe(struct pocl_device_ops *ops)
 }
 
 void
-pocl_pthread_init_device_infos(struct _cl_device_id* dev)
+pocl_pthread_init_device_infos(struct _cl_device_id* dev, size_t id)
 {
-  pocl_basic_init_device_infos(dev);
+  pocl_basic_init_device_infos(dev, id);
 
   dev->type = CL_DEVICE_TYPE_CPU;
   dev->max_work_item_sizes[0] = SIZE_MAX;
@@ -205,7 +205,7 @@ pocl_pthread_init_device_infos(struct _cl_device_id* dev)
 }
 
 void
-pocl_pthread_init (cl_device_id device, const char* parameters)
+pocl_pthread_init (cl_device_id device, size_t id, const char* parameters)
 {
   struct data *d; 
 #ifdef CUSTOM_BUFFER_ALLOCATOR  

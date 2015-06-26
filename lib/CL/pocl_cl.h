@@ -347,11 +347,11 @@ struct pocl_argument_info {
 
 struct pocl_device_ops {
   char *device_name;
-  void (*init_device_infos) (struct _cl_device_id*);
+  void (*init_device_infos) (struct _cl_device_id*, size_t id);
   /* implementation */
   void (*uninit) (cl_device_id device);
   unsigned int (*probe) (struct pocl_device_ops *ops);
-  void (*init) (cl_device_id device, const char *parameters);
+  void (*init) (cl_device_id device, size_t id, const char *parameters);
   cl_int (*alloc_mem_obj) (cl_device_id device, cl_mem mem_obj);
   void *(*create_sub_buffer) (void *data, void* buffer, size_t origin, size_t size);
   void (*free) (void *data, cl_mem_flags flags, void *ptr);

@@ -214,7 +214,7 @@ pocl_basic_init_device_ops(struct pocl_device_ops *ops)
 }
 
 void
-pocl_basic_init_device_infos(struct _cl_device_id* dev)
+pocl_basic_init_device_infos(struct _cl_device_id* dev, size_t id)
 {
   dev->type = CL_DEVICE_TYPE_CPU;
   dev->vendor_id = 0;
@@ -326,7 +326,7 @@ pocl_basic_probe(struct pocl_device_ops *ops)
 }
 
 void
-pocl_basic_init (cl_device_id device, const char* parameters)
+pocl_basic_init (cl_device_id device, size_t id, const char* parameters)
 {
   struct data *d;
   static int global_mem_id;
