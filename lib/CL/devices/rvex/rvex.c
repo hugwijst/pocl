@@ -28,6 +28,7 @@
 #include "bufalloc.h"
 #include "common.h"
 #include "cpuinfo.h"
+#include "dev_interface.h"
 #include "devices.h"
 #include "install-paths.h"
 #include "pocl_runtime_config.h"
@@ -331,13 +332,10 @@ char *pocl_rvex_init_build(void *data, const char *tmpdir)
 unsigned int
 pocl_rvex_probe(struct pocl_device_ops *ops)
 {
-  int env_count = pocl_device_get_env_count(ops->device_name);
+  size_t count;
+  get_devices(&count, NULL);
 
-  /* No env specified, assume one device by default */
-  if(env_count < 0)
-    return 1;
-
-  return env_count;
+  return count;
 }
 
 void
