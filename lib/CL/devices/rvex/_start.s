@@ -21,7 +21,7 @@ _start::
 	c0	brf $b0.0, 1b
 ;;
 2:
-	c0	call $l0.0 = $r0.2
+	c0	call $l0.0 = _dot_product_workgroup
 ;;
 __END:
 	c0	stop
