@@ -579,7 +579,8 @@ pocl_rvex_run
       else {
         cl_mem_t *mem = *(cl_mem_t **) al->value;
         /* rVEX addresses are 32-bit */
-        arg_list[i] = (uint32_t) mem->device_ptrs[cmd->device->dev_id].mem_ptr;
+        chunk_info_t *chunk = (chunk_info_t*) mem->device_ptrs[cmd->device->dev_id].mem_ptr;
+        arg_list[i] = (uint32_t)chunk->start_address;
       }
 
     } else if (kernel->arg_info[i].type == POCL_ARG_TYPE_IMAGE) {
