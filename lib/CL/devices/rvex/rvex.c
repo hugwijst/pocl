@@ -54,10 +54,10 @@
 #define WORKGROUP_STRING_LENGTH 128
 
 struct data {
+  /* Device handle */
+  struct rvex_device *rvdev;
   /* Currently loaded kernel. */
   cl_kernel current_kernel;
-  /* Loaded kernel dynamic library handle. */
-  lt_dlhandle current_dlhandle;
   /* Memory allocation bookkeeping information */
   struct memory_region memory;
 };
@@ -227,6 +227,18 @@ pocl_rvex_init_device_ops(struct pocl_device_ops *ops)
 void
 pocl_rvex_init_device_infos(struct _cl_device_id* dev, size_t id)
 {
+  struct rvex_device *rvdev = get_device(id);
+  char *name = rvex_dev_get_name(rvdev);
+  free_device(rvdev);
+
+  const char* dev_name = "rVEX: ";
+  size_t long_name_size = strlen(name) + strlen(dev_name) + 1;
+  /* We are leaking long_name, but there is nothing we can do about that */
+  char* long_name = malloc(long_name_size);
+  snprintf(long_name, long_name_size, "%s%s", dev_name, name);
+  free(name);
+
+
   dev->type = CL_DEVICE_TYPE_ACCELERATOR;
   dev->vendor_id = 0;
   dev->max_compute_units = 4;
@@ -269,7 +281,7 @@ pocl_rvex_init_device_infos(struct _cl_device_id* dev, size_t id)
   dev->max_samplers = 16;
   dev->max_constant_args = 8;
 
-  dev->max_mem_alloc_size = 0;
+  /* We can allocate up to the total available memory of 512MB */
   dev->image_support = CL_TRUE;
   dev->image_max_buffer_size = 0;
   dev->image_max_array_size = 0;
@@ -281,10 +293,11 @@ pocl_rvex_init_device_infos(struct _cl_device_id* dev, size_t id)
   dev->global_mem_cache_type = CL_NONE;
   dev->global_mem_cacheline_size = 0;
   dev->global_mem_cache_size = 0;
-  dev->global_mem_size = 0;
-  dev->max_constant_buffer_size = 0;
+  dev->global_mem_size = 512*1024*1024;
+  dev->max_mem_alloc_size = dev->global_mem_size/4;
+  dev->max_constant_buffer_size = dev->global_mem_size;
   dev->local_mem_type = CL_GLOBAL;
-  dev->local_mem_size = 0;
+  dev->local_mem_size = dev->global_mem_size;
   dev->error_correction_support = CL_FALSE;
   dev->host_unified_memory = CL_FALSE;
   dev->profiling_timer_resolution = 0;
@@ -298,7 +311,7 @@ pocl_rvex_init_device_infos(struct _cl_device_id* dev, size_t id)
   dev->printf_buffer_size = 0;
   dev->vendor = "TU_Delft";
   dev->profile = "FULL_PROFILE";
-  dev->long_name = NULL;
+  dev->long_name = long_name;
   dev->extensions = "";
   dev->llvm_target_triplet = "rvex";
   dev->llvm_cpu = "rvex-vliw";
@@ -354,27 +367,17 @@ pocl_rvex_init (cl_device_id device, size_t id, const char* parameters)
 
   d = (struct data *) calloc (1, sizeof (struct data));
   
+  d->rvdev = get_device(id);
   d->current_kernel = NULL;
-  d->current_dlhandle = 0;
   // The ML605 has 512 MBytes of RAM, starting at address 0
   init_mem_region(&d->memory, 0, 512*1024*1024);
   device->data = d;
-  pocl_topology_detect_device_info(device);
-  pocl_cpuinfo_detect_device_info(device);
 
   /* The rvex driver represents only one "compute unit" as
      it doesn't exploit multiple hardware threads. Multiple
      rvex devices can be still used for task level parallelism 
      using multiple OpenCL devices. */
   device->max_compute_units = 1;
-
-  if(!strcmp(device->llvm_cpu, "(unknown)"))
-    device->llvm_cpu = NULL;
-
-  // work-around LLVM bug where sizeof(long)=4
-  #ifdef _CL_DISABLE_LONG
-  device->has_64bit_long=0;
-  #endif
 }
 
 cl_int
@@ -810,6 +813,7 @@ void
 pocl_rvex_uninit (cl_device_id device)
 {
   struct data *d = (struct data*)device->data;
+  free_device(d->rvdev);
   POCL_MEM_FREE(d);
   device->data = NULL;
 }
