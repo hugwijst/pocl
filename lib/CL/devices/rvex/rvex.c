@@ -32,6 +32,7 @@
 #include "devices.h"
 #include "install-paths.h"
 #include "pocl_runtime_config.h"
+#include "pocl_util.h"
 #include "rvex_compile.h"
 #include "utlist.h"
 
@@ -40,6 +41,7 @@
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
+#include <time.h>
 
 #ifndef _MSC_VER
 #  include <sys/time.h>
@@ -623,6 +625,30 @@ pocl_rvex_run
   /* Write argument data to rvex */
   pocl_rvex_write(data, arguments, arguments_dev, 0, alloc_size);
 
+  /* Reserve space for program and write program */
+  /* TODO: determine memory size from elf file */
+  chunk_info_t *prog_alloc = alloc_buffer(&d->memory, 1*1024*1024);
+  {
+    char *binbuffer;
+
+    const char *binfile = rvex_link (cmd->command.run.tmp_dir,
+        (const char*)cmd->command.run.wg, prog_alloc->start_address,
+        cmd->command.run.kernel);
+    size_t fsize = pocl_read_binary_file(binfile, (void**)&binbuffer);
+    assert(fsize > 0);
+
+    pocl_rvex_write(data, binbuffer, prog_alloc, 0, fsize);
+
+    free(binbuffer);
+
+    if (!pocl_get_bool_option("POCL_LEAVE_KERNEL_COMPILER_TEMP_FILES", 0)) {
+      pocl_remove_file(binfile);
+    }
+    free((void*)binfile);
+  }
+
+  /* allocate pocl context */
+  chunk_info_t *ctxt_alloc = alloc_buffer(&d->memory, sizeof(*pc));
   for (z = 0; z < pc->num_groups[2]; ++z)
     {
       for (y = 0; y < pc->num_groups[1]; ++y)
@@ -633,13 +659,22 @@ pocl_rvex_run
               pc->group_id[1] = y;
               pc->group_id[2] = z;
 
-#if 0
-              cmd->command.run.wg (arg_list, pc);
-#endif
+              pocl_rvex_write(data, pc, ctxt_alloc, 0,
+                  sizeof(*pc));
 
+              rvex_dev_set_run(d->rvdev, false);
+              rvex_dev_set_reset(d->rvdev, true);
+              rvex_dev_set_reset(d->rvdev, false);
+              rvex_dev_set_pc(d->rvdev, prog_alloc->start_address);
+              rvex_dev_set_run(d->rvdev, true);
+
+              while(!rvex_dev_get_done(d->rvdev)) {
+                nanosleep(&(struct timespec){.tv_nsec=1000000}, NULL);
+              }
             }
         }
     }
+  free_chunk(ctxt_alloc);
 
   /* Copy CL_MEM_USE_HOST_PTR argument data back to the host */
   for (i = 0; i < kernel->num_args; ++i) {
@@ -658,6 +693,7 @@ pocl_rvex_run
   }
 
   /* Free allocated memory */
+  free_chunk(prog_alloc);
   free_chunk(arguments_dev);
   free(arguments);
 }
@@ -908,6 +944,7 @@ static void check_compiler_cache (_cl_command_node *cmd)
   const char* module_fn = rvex_llvm_codegen (cmd->command.run.tmp_dir,
                                         cmd->command.run.kernel,
                                         cmd->device);
+  cmd->command.run.wg = (void*)module_fn;
 #if 0
   /* TODO: load correct workgroup info in structures */
   dlhandle = lt_dlopen (module_fn);

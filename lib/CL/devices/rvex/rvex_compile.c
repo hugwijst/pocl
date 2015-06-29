@@ -140,4 +140,63 @@ rvex_llvm_codegen (const char* tmpdir, cl_kernel kernel, cl_device_id device) {
   return module;
 }
 
+/**
+ * Link an elf file against a memory map and create binary file that can be
+ * uploaded to the target.
+ */
+const char*
+rvex_link (const char* tmpdir, const char* objfile, size_t start_address, cl_kernel kernel) {
+  int error;
+
+  const char* pocl_verbose_ptr =
+    pocl_get_string_option("POCL_VERBOSE", (char*)NULL);
+  int pocl_verbose = pocl_verbose_ptr && *pocl_verbose_ptr;
+
+  char command[COMMAND_LENGTH];
+  char elffile[POCL_FILENAME_LENGTH];
+
+  char* module = (char*) malloc(POCL_FILENAME_LENGTH); // strlen of / .so 4+1
+
+  error = snprintf (module, POCL_FILENAME_LENGTH, "%s/%s_%zu.bin", tmpdir,
+          kernel->function_name, start_address);
+  assert (error >= 0);
+
+  error = snprintf (elffile, POCL_FILENAME_LENGTH, "%s/%s_%zu.elf", tmpdir,
+          kernel->function_name, start_address);
+  assert (error >= 0);
+
+  if (access (module, F_OK) != 0) {
+      /* relocate the obj file at the correct location */
+      error = snprintf (command, COMMAND_LENGTH, "rvex-elf32-ld -Ttext=%zu -o %s %s",
+            start_address, elffile, objfile);
+      assert (error >= 0);
+
+      if (pocl_verbose) {
+        fprintf(stderr, "[pocl] executing [%s]\n", command);
+        fflush(stderr);
+      }
+      error = system (command);
+      assert (error == 0);
+
+      /* create a binary file */
+      error = snprintf (command, COMMAND_LENGTH, "rvex-elf32-objcopy -O binary %s %s",
+            elffile, module);
+      assert (error >= 0);
+
+      if (pocl_verbose) {
+        fprintf(stderr, "[pocl] executing [%s]\n", command);
+        fflush(stderr);
+      }
+      error = system (command);
+      assert (error == 0);
+
+      /* Save space in kernel cache */
+      if (!pocl_get_bool_option("POCL_LEAVE_KERNEL_COMPILER_TEMP_FILES", 0)) {
+          pocl_remove_file(elffile);
+      }
+  }
+
+  return module;
+}
+
 /* vim: set ts=4 expandtab: */

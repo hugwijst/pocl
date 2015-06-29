@@ -97,6 +97,32 @@ pocl_create_or_append_file (const char *file_name, const char *content)
   fclose(fp);
 }
 
+size_t
+pocl_read_binary_file (const char* file_name, void** content_dptr)
+{
+  FILE *fp;
+  struct stat st;
+  off_t file_size;
+
+  stat(file_name, &st);
+  file_size = st.st_size;
+
+  fp = fopen(file_name, "rb");
+  if (fp == NULL)
+    return 0;
+
+  *content_dptr = (char*) malloc((file_size + 1) * sizeof(char));
+  if (!(*content_dptr)) {
+    fclose(fp);
+    return 0;
+  }
+
+  size_t read = fread(*content_dptr, sizeof(char), file_size, fp);
+
+  fclose(fp);
+  return read;
+}
+
 int
 pocl_read_text_file (const char* file_name, char** content_dptr)
 {
