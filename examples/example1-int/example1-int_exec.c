@@ -2,6 +2,8 @@
 #include <CL/opencl.h>
 #include <poclu.h>
 
+#include <stdio.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -37,6 +39,17 @@ exec_dot_product_kernel(const char *program_source,
   clGetContextInfo(context, CL_CONTEXT_DEVICES, 0, NULL, &cb);
   devices = (cl_device_id *) malloc(cb);
   clGetContextInfo(context, CL_CONTEXT_DEVICES, cb, devices, NULL);
+
+  // print the name of device 0
+  {
+    size_t name_cb;
+    char * name;
+    clGetDeviceInfo(devices[0], CL_DEVICE_NAME, 0, NULL, &name_cb);
+    name = (char *) malloc(name_cb);
+    clGetDeviceInfo(devices[0], CL_DEVICE_NAME, name_cb, name, NULL);
+    printf("Using device \"%s\".\n", name);
+    free(name);
+  }
 
   // create a command-queue
   cmd_queue = clCreateCommandQueue(context, devices[0], 0, NULL);
