@@ -22,7 +22,8 @@
  * Uses an existing (cached) one, if available.
  *
  * @param tmpdir The directory of the work-group function bitcode.
- * @param return the generated binary filename.
+ * @param return the generated relocatable ELF file. The file needs to be
+ * linked again with a correct memory map.
  *
  * Original in devices/common.c
  */
@@ -49,17 +50,17 @@ rvex_llvm_codegen (const char* tmpdir, cl_kernel kernel, cl_device_id device) {
 
   error = snprintf
     (module, POCL_FILENAME_LENGTH,
-     "%s/%s.so", tmpdir, kernel->function_name);
+     "%s/%s.o", tmpdir, kernel->function_name);
   assert (error >= 0);
 
   error = snprintf
     (objfile, POCL_FILENAME_LENGTH,
-     "%s/%s.so.o", tmpdir, kernel->function_name);
+     "%s/%s_wg.o", tmpdir, kernel->function_name);
   assert (error >= 0);
 
   error = snprintf
     (asmfile, POCL_FILENAME_LENGTH,
-     "%s/%s.so.s", tmpdir, kernel->function_name);
+     "%s/%s_wg.s", tmpdir, kernel->function_name);
   assert (error >= 0);
 
   if (pocl_get_bool_option("POCL_BUILDING", 0)) {
@@ -115,9 +116,9 @@ rvex_llvm_codegen (const char* tmpdir, cl_kernel kernel, cl_device_id device) {
       error = system (command);
       assert (error == 0);
 
-      // clang is used as the linker driver in LINK_CMD
+      // link the object files into one object file
       error = snprintf (command, COMMAND_LENGTH,
-            "rvex-elf32-ld -o %s %s %s",
+            "rvex-elf32-ld -r -o %s %s %s",
             module, start_objfile, objfile);
       assert (error >= 0);
 
