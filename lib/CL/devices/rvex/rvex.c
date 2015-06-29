@@ -406,7 +406,7 @@ pocl_rvex_alloc_mem_obj (cl_device_id device, cl_mem mem_obj)
     dev_ptrs->global_mem_id = device->global_mem_id;
 
     if (flags & CL_MEM_USE_HOST_PTR || flags & CL_MEM_COPY_HOST_PTR) {
-      pocl_rvex_write(data, mem_obj->mem_host_ptr, (void*)chunk->start_address,
+      pocl_rvex_write(data, mem_obj->mem_host_ptr, chunk,
           0, mem_obj->size);
     }
   }
@@ -430,6 +430,13 @@ pocl_rvex_read (void *data, void *host_ptr, const void *device_ptr,
     size_t offset, size_t cb)
 {
   int res;
+  chunk_info_t *chunk = (chunk_info_t*)device_ptr;
+
+  if (pocl_get_bool_option("POCL_VERBOSE", 0)) {
+    fprintf(stderr, "[pocl] reading %zu bytes from 0x%zx+0x%zx\n", cb,
+        chunk->start_address, offset);
+    fflush(stderr);
+  }
 
   FILE *f = fopen("/dev/rvex0", "r");
   if (f == NULL) {
@@ -437,7 +444,7 @@ pocl_rvex_read (void *data, void *host_ptr, const void *device_ptr,
     return;
   }
 
-  res = fseek(f, (size_t)device_ptr + offset, SEEK_SET);
+  res = fseek(f, chunk->start_address + offset, SEEK_SET);
   if (res != 0) {
     fclose(f);
     return;
@@ -457,6 +464,13 @@ pocl_rvex_write (void *data, const void *host_ptr, void *device_ptr,
     size_t offset, size_t cb)
 {
   int res;
+  chunk_info_t *chunk = (chunk_info_t*)device_ptr;
+
+  if (pocl_get_bool_option("POCL_VERBOSE", 0)) {
+    fprintf(stderr, "[pocl] writing %zu bytes to 0x%zx+0x%zx\n", cb,
+        chunk->start_address, offset);
+    fflush(stderr);
+  }
 
   FILE *f = fopen("/dev/rvex0", "r+");
   if (f == NULL) {
@@ -464,7 +478,7 @@ pocl_rvex_write (void *data, const void *host_ptr, void *device_ptr,
     return;
   }
 
-  res = fseek(f, (size_t)device_ptr + offset, SEEK_SET);
+  res = fseek(f, chunk->start_address + offset, SEEK_SET);
   if (res != 0) {
     fclose(f);
     return;
@@ -635,8 +649,8 @@ pocl_rvex_run
         cl_mem_t *mem = *(cl_mem_t **) al->value;
 
         if(mem->flags & CL_MEM_USE_HOST_PTR) {
-          void* mem_dev_ptr = mem->device_ptrs[cmd->device->dev_id].mem_ptr;
-          pocl_rvex_read(data, mem->mem_host_ptr, mem_dev_ptr, 0, mem->size);
+          chunk_info_t* chunk = (chunk_info_t*)mem->device_ptrs[cmd->device->dev_id].mem_ptr;
+          pocl_rvex_read(data, mem->mem_host_ptr, chunk, 0, mem->size);
         }
       }
     }
