@@ -4,7 +4,7 @@ __kernel void
 dot_product (__global const int4 *a,
         __global const int4 *b, __global int *c)
 {
-  int gid = get_global_id(0);
+  size_t gid = get_global_id(0);
 
 #ifndef USE_VECTOR_DATATYPES
   /* This version is to smoke test the autovectorization.
