@@ -495,7 +495,7 @@ pocl_rvex_write (void *data, const void *host_ptr, void *device_ptr,
   }
 }
 
-inline size_t align_size(size_t s, size_t psize) {
+static inline size_t align_size(size_t s, size_t psize) {
   return (s + psize - 1) / psize * psize;
 }
 
