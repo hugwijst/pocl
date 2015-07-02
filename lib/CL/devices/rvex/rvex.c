@@ -38,6 +38,8 @@
 
 #include "topology/pocl_topology.h"
 
+#include <endian.h>
+
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
@@ -556,12 +558,15 @@ pocl_rvex_run
 
   /* Allocate total argument data memory */
   uint8_t *arguments = malloc(alloc_size);
-  chunk_info_t *arguments_dev = alloc_buffer(&d->memory, alloc_size);
+  chunk_info_t *args_alloc = alloc_buffer(&d->memory, alloc_size);
+
+  /* allocate pocl context (second argument to wg) */
+  chunk_info_t *ctxt_alloc = alloc_buffer(&d->memory, sizeof(*pc));
 
   /* The arguments array is located at the beginning of the arg_data array */
   uint32_t *arg_list = (uint32_t*)&arguments[0];
   uint8_t *arg_data = &arguments[arg_list_size];
-  uint32_t p_arg_data_dev = arguments_dev->start_address + arg_list_size;
+  uint32_t p_arg_data_dev = args_alloc->start_address + arg_list_size;
 
   /* Process the kernel arguments. Convert the opaque buffer
      pointers to real device pointers, allocate dynamic local 
@@ -570,7 +575,7 @@ pocl_rvex_run
     struct pocl_argument *al = &(cmd->command.run.arguments[i]);
 
     if (kernel->arg_info[i].is_local) {
-      arg_list[i] = p_arg_data_dev;
+      arg_list[i] = htobe32(p_arg_data_dev);
       p_arg_data_dev += align_size(al->size, psize);
 
     } else if (kernel->arg_info[i].type == POCL_ARG_TYPE_POINTER) {
@@ -584,7 +589,7 @@ pocl_rvex_run
         cl_mem_t *mem = *(cl_mem_t **) al->value;
         /* rVEX addresses are 32-bit */
         chunk_info_t *chunk = (chunk_info_t*) mem->device_ptrs[cmd->device->dev_id].mem_ptr;
-        arg_list[i] = (uint32_t)chunk->start_address;
+        arg_list[i] = htobe32((uint32_t)chunk->start_address);
       }
 
     } else if (kernel->arg_info[i].type == POCL_ARG_TYPE_IMAGE) {
@@ -625,7 +630,7 @@ pocl_rvex_run
   }
 
   /* Write argument data to rvex */
-  pocl_rvex_write(data, arguments, arguments_dev, 0, alloc_size);
+  pocl_rvex_write(data, arguments, args_alloc, 0, alloc_size);
 
   /* Reserve space for program and write program */
   /* TODO: determine memory size from elf file */
@@ -639,6 +644,10 @@ pocl_rvex_run
     size_t fsize = pocl_read_binary_file(binfile, (void**)&binbuffer);
     assert(fsize > 0);
 
+    /* Write pointers to first and second argument of workgroup to data */
+    *(uint32_t*)&binbuffer[0] = htobe32(args_alloc->start_address);
+    *(uint32_t*)&binbuffer[4] = htobe32(ctxt_alloc->start_address);
+
     pocl_rvex_write(data, binbuffer, prog_alloc, 0, fsize);
 
     free(binbuffer);
@@ -649,8 +658,6 @@ pocl_rvex_run
     free((void*)binfile);
   }
 
-  /* allocate pocl context */
-  chunk_info_t *ctxt_alloc = alloc_buffer(&d->memory, sizeof(*pc));
   for (z = 0; z < pc->num_groups[2]; ++z)
     {
       for (y = 0; y < pc->num_groups[1]; ++y)
@@ -665,7 +672,7 @@ pocl_rvex_run
                   sizeof(*pc));
 
               rvex_dev_set_run(d->rvdev, false);
-              rvex_dev_set_reset_vector(d->rvdev, prog_alloc->start_address);
+              rvex_dev_set_reset_vector(d->rvdev, prog_alloc->start_address + 8);
               rvex_dev_set_reset(d->rvdev, true);
               rvex_dev_set_reset(d->rvdev, false);
               rvex_dev_set_run(d->rvdev, true);
@@ -676,8 +683,6 @@ pocl_rvex_run
             }
         }
     }
-  free_chunk(ctxt_alloc);
-
   /* Copy CL_MEM_USE_HOST_PTR argument data back to the host */
   for (i = 0; i < kernel->num_args; ++i) {
     if (kernel->arg_info[i].type == POCL_ARG_TYPE_POINTER) {
@@ -696,7 +701,8 @@ pocl_rvex_run
 
   /* Free allocated memory */
   free_chunk(prog_alloc);
-  free_chunk(arguments_dev);
+  free_chunk(ctxt_alloc);
+  free_chunk(args_alloc);
   free(arguments);
 }
 
