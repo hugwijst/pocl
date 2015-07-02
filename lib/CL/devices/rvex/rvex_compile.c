@@ -167,7 +167,7 @@ rvex_link (const char* tmpdir, const char* objfile, size_t start_address, cl_ker
 
   if (access (module, F_OK) != 0) {
       /* relocate the obj file at the correct location */
-      error = snprintf (command, COMMAND_LENGTH, "rvex-elf32-ld -Ttext=%zu -o %s %s",
+      error = snprintf (command, COMMAND_LENGTH, "rvex-elf32-ld -Ttext=%zx -o %s %s",
             start_address, elffile, objfile);
       assert (error >= 0);
 
