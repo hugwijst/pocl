@@ -57,7 +57,7 @@
 
 struct data {
   /* Device handle */
-  struct rvex_device *rvdev;
+  struct rvex_core *rvdev;
   /* Currently loaded kernel. */
   cl_kernel current_kernel;
   /* Memory allocation bookkeeping information */
@@ -229,7 +229,7 @@ pocl_rvex_init_device_ops(struct pocl_device_ops *ops)
 void
 pocl_rvex_init_device_infos(struct _cl_device_id* dev, size_t id)
 {
-  struct rvex_device *rvdev = get_device(id);
+  struct rvex_core *rvdev = get_device(id);
   char *name = rvex_dev_get_name(rvdev);
   free_device(rvdev);
 
@@ -432,6 +432,7 @@ pocl_rvex_read (void *data, void *host_ptr, const void *device_ptr,
     size_t offset, size_t cb)
 {
   int res;
+  struct data *d = (struct data*) data;
   chunk_info_t *chunk = (chunk_info_t*)device_ptr;
 
   if (pocl_get_bool_option("POCL_VERBOSE", 0)) {
@@ -440,9 +441,9 @@ pocl_rvex_read (void *data, void *host_ptr, const void *device_ptr,
     fflush(stderr);
   }
 
-  FILE *f = fopen("/dev/rvex0", "r");
+  FILE *f = fopen(rvex_dev_get_memfile(d->rvdev), "r");
   if (f == NULL) {
-    fprintf(stderr, "Couldn't open /dev/rvex0!\n");
+    fprintf(stderr, "Couldn't open %s for reading!\n", rvex_dev_get_memfile(d->rvdev));
     return;
   }
 
@@ -466,6 +467,7 @@ pocl_rvex_write (void *data, const void *host_ptr, void *device_ptr,
     size_t offset, size_t cb)
 {
   int res;
+  struct data *d = (struct data*) data;
   chunk_info_t *chunk = (chunk_info_t*)device_ptr;
 
   if (pocl_get_bool_option("POCL_VERBOSE", 0)) {
@@ -474,9 +476,9 @@ pocl_rvex_write (void *data, const void *host_ptr, void *device_ptr,
     fflush(stderr);
   }
 
-  FILE *f = fopen("/dev/rvex0", "r+");
+  FILE *f = fopen(rvex_dev_get_memfile(d->rvdev), "r+");
   if (f == NULL) {
-    fprintf(stderr, "Couldn't open /dev/rvex0!\n");
+    fprintf(stderr, "Couldn't open %s for writing!\n", rvex_dev_get_memfile(d->rvdev));
     return;
   }
 
@@ -663,9 +665,9 @@ pocl_rvex_run
                   sizeof(*pc));
 
               rvex_dev_set_run(d->rvdev, false);
+              rvex_dev_set_reset_vector(d->rvdev, prog_alloc->start_address);
               rvex_dev_set_reset(d->rvdev, true);
               rvex_dev_set_reset(d->rvdev, false);
-              rvex_dev_set_pc(d->rvdev, prog_alloc->start_address);
               rvex_dev_set_run(d->rvdev, true);
 
               while(!rvex_dev_get_done(d->rvdev)) {

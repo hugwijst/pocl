@@ -2,134 +2,142 @@
 
 #include "pocl_runtime_config.h"
 
-#include "llvm/Support/FileSystem.h"
-#include "llvm/Support/Path.h"
+#include <libudev.h>
 
 #include <sstream>
 #include <fstream>
 
-namespace fs = llvm::sys::fs;
-namespace path = llvm::sys::path;
+#include <cstring>
 
-struct rvex_device {
-  size_t fpga_id;
-  size_t core_id;
+struct rvex_core {
+  struct udev *udev;
+  struct udev_device *dev;
 
-  std::string core_path;
-  std::string cdev_path;
-};
+  rvex_core(struct udev_device *core_dev) {
+    udev = udev_device_get_udev(core_dev);
+    dev = core_dev;
 
-fs::directory_iterator get_fpga_iter() {
-  if (!fs::is_directory("/sys/class/rvex"))
-    return fs::directory_iterator();
-
-  std::error_code ec;
-  return fs::directory_iterator("/sys/class/rvex", ec);
-}
-
-void get_devices(size_t *n, struct rvex_device **devs) {
-  *n = 0;
-  size_t nfpga = 0, ncore = 0;
-  fs::directory_iterator end;
-
-  fs::directory_iterator fpga_iter = get_fpga_iter();
-
-  while(fpga_iter != end) {
-    std::error_code ec;
-
-    fs::directory_iterator core_iter(fpga_iter->path(), ec);
-
-    while(core_iter != end) {
-      const std::string &core_path = fpga_iter->path();
-
-      if (!fs::is_directory(core_path)
-          || !path::filename(core_path).startswith("core")) {
-        continue;
-      }
-
-      if(devs != nullptr) {
-        struct rvex_device *dev = new rvex_device;
-
-        dev->fpga_id = nfpga;
-        dev->core_id = ncore;
-        dev->core_path = core_path;
-        std::ostringstream oss;
-        oss << "/dev/rvex" << *n;
-        dev->cdev_path = oss.str();
-
-        devs[*n] = dev;
-      }
-
-      ncore++;
-      (*n)++;
-      core_iter.increment(ec);
-    }
-
-    nfpga++;
-    fpga_iter.increment(ec);
+    udev_ref(udev);
+    udev_device_ref(dev);
   }
 
-  if (pocl_get_bool_option("POCL_FAKE_RVEX", 0)) {
+  ~rvex_core() {
+    udev_device_unref(dev);
+    udev_unref(udev);
+  }
+
+  std::string name() {
+    return udev_device_get_sysname(dev);
+  }
+
+  std::string fpga_name() {
+    struct udev_device *parent = udev_device_get_parent(dev);
+    if(parent == nullptr) {
+      return nullptr;
+    }
+    return udev_device_get_sysname(parent);
+  }
+
+  std::string syspath() {
+    return udev_device_get_syspath(dev);
+  }
+
+  const char *mem_devnode() {
+    struct udev_device *parent = udev_device_get_parent(dev);
+    if(parent == nullptr) {
+      return nullptr;
+    }
+    return udev_device_get_devnode(parent);
+  }
+};
+
+
+void get_devices(size_t *n, struct rvex_core **devs) {
+  struct udev *udev;
+  struct udev_enumerate *enumerate;
+  struct udev_list_entry *devices, *dev_list_entry;
+  struct udev_device *dev;
+
+  *n = 0;
+
+  /* create new udev context */
+  udev = udev_new();
+  if (udev == nullptr) {
+    return;
+  }
+
+  /* scan for rvex core devices */
+  enumerate = udev_enumerate_new(udev);
+  udev_enumerate_add_match_subsystem(enumerate, "rvex-core");
+  udev_enumerate_scan_devices(enumerate);
+  devices = udev_enumerate_get_list_entry(enumerate);
+
+  udev_list_entry_foreach(dev_list_entry, devices) {
     if(devs != nullptr) {
-      struct rvex_device *dev = new rvex_device;
+      const char *path;
 
-      dev->fpga_id = nfpga;
-      dev->core_id = ncore;
-      dev->core_path = "FAKE";
-      std::ostringstream oss;
-      oss << "/dev/rvex" << *n;
-      dev->cdev_path = oss.str();
+      path = udev_list_entry_get_name(dev_list_entry);
+      dev = udev_device_new_from_syspath(udev, path);
 
-      devs[*n] = dev;
+      devs[*n] = new rvex_core(dev);
+
+      udev_device_unref(dev);
     }
 
     (*n)++;
   }
+
+  udev_enumerate_unref(enumerate);
+
+  udev_unref(udev);
 }
 
-struct rvex_device * get_device(const size_t id) {
-  size_t nfpga = 0, ncore = 0, n = 0;
-  fs::directory_iterator end;
-  fs::directory_iterator fpga_iter = get_fpga_iter();
+struct rvex_core * get_device(const size_t id) {
+  struct udev *udev;
+  struct udev_enumerate *enumerate;
+  struct udev_list_entry *devices, *dev_list_entry;
+  struct udev_device *dev;
 
-  while(fpga_iter != end) {
-    std::error_code ec;
+  size_t n = 0;
 
-    fs::directory_iterator core_iter(fpga_iter->path(), ec);
-
-    while(core_iter != end) {
-      const std::string &core_path = fpga_iter->path();
-
-      if (!fs::is_directory(core_path)
-          || !path::filename(core_path).startswith("core")) {
-        continue;
-      }
-
-      if(n == id) {
-        struct rvex_device *dev = new rvex_device;
-
-        dev->fpga_id = nfpga;
-        dev->core_id = ncore;
-        dev->core_path = core_path;
-        std::ostringstream oss;
-        oss << "/dev/rvex" << n;
-        dev->cdev_path = oss.str();
-
-        return dev;
-      }
-
-      ncore++;
-      n++;
-      core_iter.increment(ec);
-    }
-
-    nfpga++;
-    fpga_iter.increment(ec);
+  /* create new udev context */
+  udev = udev_new();
+  if (udev == nullptr) {
+    return nullptr;
   }
 
+  /* scan for rvex core devices */
+  enumerate = udev_enumerate_new(udev);
+  udev_enumerate_add_match_subsystem(enumerate, "rvex-core");
+  udev_enumerate_scan_devices(enumerate);
+  devices = udev_enumerate_get_list_entry(enumerate);
+
+  udev_list_entry_foreach(dev_list_entry, devices) {
+    if(n == id) {
+      const char *path;
+
+      path = udev_list_entry_get_name(dev_list_entry);
+      dev = udev_device_new_from_syspath(udev, path);
+
+      struct rvex_core *core = new rvex_core(dev);
+
+      udev_device_unref(dev);
+      udev_enumerate_unref(enumerate);
+      udev_unref(udev);
+
+      return core;
+    }
+
+    n++;
+  }
+
+  udev_enumerate_unref(enumerate);
+
+  udev_unref(udev);
+#if 0
   if (pocl_get_bool_option("POCL_FAKE_RVEX", 0)) {
     if(n == id) {
-      struct rvex_device *dev = new rvex_device;
+      struct rvex_core *dev = new rvex_core;
 
       dev->fpga_id = nfpga;
       dev->core_id = ncore;
@@ -143,17 +151,18 @@ struct rvex_device * get_device(const size_t id) {
 
     n++;
   }
+#endif
 
   return nullptr;
 }
 
-void free_devices(size_t n, struct rvex_device **devs) {
+void free_devices(size_t n, struct rvex_core **devs) {
   for(size_t i = 0; i < n; ++i) {
     delete devs[i];
   }
 }
 
-void free_device(struct rvex_device *dev) {
+void free_device(struct rvex_core *dev) {
     delete dev;
 }
 
@@ -162,32 +171,35 @@ void free_device(struct rvex_device *dev) {
  *
  * The returned string should be freed by the caller.
  */
-char *rvex_dev_get_name(struct rvex_device *dev) {
-  const char *fmt_str = "fpga%d - core%d";
+char *rvex_dev_get_name(struct rvex_core *core) {
+  std::string name = core->fpga_name() + " - " + core->name();
 
-  int size = snprintf(NULL, 0, fmt_str, dev->fpga_id, dev->core_id);
-
-  char *res = (char*)malloc(size+1);
+  char *res = (char*)malloc(name.size()+1);
   if (res == nullptr) {
     return res;
   }
 
-  snprintf(res, size+1, fmt_str, dev->fpga_id, dev->core_id);
+  std::memcpy(res, name.c_str(), name.size()+1);
   return res;
 }
 
+const char *rvex_dev_get_memfile(struct rvex_core *core) {
+  return core->mem_devnode();
+}
+
+/* TODO: use get/set_sysattr_value */
 #define RVEX_DEV_GET(_reg, _type)                                             \
-  _type rvex_dev_get_##_reg (struct rvex_device *dev) {                       \
+  _type rvex_dev_get_##_reg (struct rvex_core *core) {                        \
     _type res;                                                                \
-    std::ifstream f(dev->core_path + "/context0/"#_reg);                      \
+    std::ifstream f(core->syspath() + "/context0/"#_reg);                     \
                                                                               \
     f >> res;                                                                 \
     return res;                                                               \
   }
 
 #define RVEX_DEV_SET(_reg, _type)                                             \
-  void rvex_dev_set_##_reg (struct rvex_device *dev, _type val) {             \
-    std::ofstream f(dev->core_path + "/context0/"#_reg);                      \
+  void rvex_dev_set_##_reg (struct rvex_core *core, _type val) {              \
+    std::ofstream f(core->syspath() + "/context0/"#_reg);                     \
     f << val;                                                                 \
   }
 
@@ -196,6 +208,9 @@ RVEX_DEV_SET(pc, uint32_t);
 
 RVEX_DEV_GET(reset, bool);
 RVEX_DEV_SET(reset, bool);
+
+RVEX_DEV_GET(reset_vector, uint32_t);
+RVEX_DEV_SET(reset_vector, uint32_t);
 
 RVEX_DEV_GET(run, bool);
 RVEX_DEV_SET(run, bool);

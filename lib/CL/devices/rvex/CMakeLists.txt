@@ -23,10 +23,9 @@
 #
 #=============================================================================
 
-include_directories(${LLVM_INCLUDE_DIRS})
-
 # set llvm C++ flags on dev_interface.cc
-set_source_files_properties("dev_interface.cc" PROPERTIES COMPILE_FLAGS "${LLVM_CXXFLAGS}")
+set_source_files_properties("dev_interface.cc" PROPERTIES COMPILE_FLAGS "-std=c++11")
+
 
 if(MSVC)
   set_source_files_properties( rvex.h rvex.c rvex_compile.h rvex_compile.c dev_interface.h dev_interface.cc PROPERTIES LANGUAGE CXX )

@@ -737,6 +737,8 @@ setup_cached_var(ENABLE_RVEX "RVEX"
   "rVEX is available, but requested disabling it")
 
 if(ENABLE_RVEX)
+  set(LD_FLAGS_BIN ${LD_FLAGS_BIN} "-ludev")
+
   set(OCL_DRIVERS "${OCL_DRIVERS} rvex")
   set(OCL_TARGETS "${OCL_TARGETS} rvex")
 endif()
