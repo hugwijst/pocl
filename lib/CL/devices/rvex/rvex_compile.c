@@ -48,9 +48,12 @@ rvex_llvm_codegen (const char* tmpdir, cl_kernel kernel, cl_device_id device) {
 
   int error;
 
+  /* NB: Don't change the name of this file. It is checked for in
+     clEnqueueNDRangeKernel to determine if the command file should be compiled
+     again */
   error = snprintf
     (module, POCL_FILENAME_LENGTH,
-     "%s/%s.o", tmpdir, kernel->function_name);
+     "%s/%s.so", tmpdir, kernel->function_name);
   assert (error >= 0);
 
   error = snprintf
