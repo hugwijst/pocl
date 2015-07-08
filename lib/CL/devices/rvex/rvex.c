@@ -499,6 +499,15 @@ pocl_rvex_write (void *data, const void *host_ptr, void *device_ptr,
   }
 }
 
+/* The rVEX is a 32-bit big-endian architecture. Define our own pocl-context
+   so it also works on 64-bit architectures. */
+struct rvex_pocl_context {
+  uint32_t work_dim;
+  uint32_t num_groups[3];
+  uint32_t group_id[3];
+  uint32_t global_offset[3];
+};
+
 static inline size_t align_size(size_t s, size_t psize) {
   return (s + psize - 1) / psize * psize;
 }
@@ -513,6 +522,7 @@ pocl_rvex_run
   unsigned i;
   cl_kernel kernel = cmd->command.run.kernel;
   struct pocl_context *pc = &cmd->command.run.pc;
+  struct rvex_pocl_context rvex_pc;
   /* rVEX has 4 byte pointers */
   const size_t psize = 4;
 
@@ -561,7 +571,7 @@ pocl_rvex_run
   chunk_info_t *args_alloc = alloc_buffer(&d->memory, alloc_size);
 
   /* allocate pocl context (second argument to wg) */
-  chunk_info_t *ctxt_alloc = alloc_buffer(&d->memory, sizeof(*pc));
+  chunk_info_t *ctxt_alloc = alloc_buffer(&d->memory, sizeof(rvex_pc));
 
   /* The arguments array is located at the beginning of the arg_data array */
   uint32_t *arg_list = (uint32_t*)&arguments[0];
@@ -668,8 +678,15 @@ pocl_rvex_run
               pc->group_id[1] = y;
               pc->group_id[2] = z;
 
-              pocl_rvex_write(data, pc, ctxt_alloc, 0,
-                  sizeof(*pc));
+              rvex_pc.work_dim =  htobe32(pc->work_dim);
+              for (int i = 0; i < 3; i++) {
+                  rvex_pc.num_groups   [i] = htobe32(pc->num_groups   [i]);
+                  rvex_pc.group_id     [i] = htobe32(pc->group_id     [i]);
+                  rvex_pc.global_offset[i] = htobe32(pc->global_offset[i]);
+              }
+
+              pocl_rvex_write(data, &rvex_pc, ctxt_alloc, 0,
+                  sizeof(rvex_pc));
 
               rvex_dev_set_run(d->rvdev, false);
               rvex_dev_set_reset_vector(d->rvdev, prog_alloc->start_address + 8);
