@@ -131,7 +131,7 @@ rvex_llvm_codegen (const char* tmpdir, cl_kernel kernel, cl_device_id device) {
 
       // assemble _start.s
       if (pocl_verbose) {
-        fprintf(stderr, "[pocl] assembling files: %s, %s\n", start_objfile, start_asmfile);
+        fprintf(stderr, "[pocl] assembling files: %s -> %s\n", start_asmfile, start_objfile);
         fflush(stderr);
       }
       error = snprintf (command, COMMAND_LENGTH,
