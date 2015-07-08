@@ -39,6 +39,7 @@ rvex_llvm_codegen (const char* tmpdir, cl_kernel kernel, cl_device_id device) {
   char command[COMMAND_LENGTH];
   char bytecode[POCL_FILENAME_LENGTH];
   char objfile[POCL_FILENAME_LENGTH];
+  char resched_asmfile[POCL_FILENAME_LENGTH];
   char asmfile[POCL_FILENAME_LENGTH];
   char start_asmfile[POCL_FILENAME_LENGTH];
   char start_objfile[POCL_FILENAME_LENGTH];
@@ -59,6 +60,11 @@ rvex_llvm_codegen (const char* tmpdir, cl_kernel kernel, cl_device_id device) {
   error = snprintf
     (objfile, POCL_FILENAME_LENGTH,
      "%s/%s_wg.o", tmpdir, kernel->function_name);
+  assert (error >= 0);
+
+  error = snprintf
+    (resched_asmfile, POCL_FILENAME_LENGTH,
+     "%s/%s_wg_resched.s", tmpdir, kernel->function_name);
   assert (error >= 0);
 
   error = snprintf
@@ -91,13 +97,29 @@ rvex_llvm_codegen (const char* tmpdir, cl_kernel kernel, cl_device_id device) {
       error = pocl_llvm_codegen( kernel, device, bytecode, asmfile, 0);
       assert (error == 0);
 
-      // assemble the file
+      // reschedule the generated assembly
       if (pocl_verbose) {
-        fprintf(stderr, "[pocl] assembling files: %s, %s\n", objfile, asmfile);
+        fprintf(stderr, "[pocl] rescheduling assembly file: %s -> %s\n", asmfile, resched_asmfile);
         fflush(stderr);
       }
       error = snprintf (command, COMMAND_LENGTH,
-            assembly_cmd, kernel->function_name, objfile, asmfile);
+            "vexparse %s --resched --borrow=1.0.3.2.5.4.7.6 --config=3333337B -o %s", asmfile, resched_asmfile);
+      assert (error >= 0);
+
+      if (pocl_verbose) {
+        fprintf(stderr, "[pocl] executing [%s]\n", command);
+        fflush(stderr);
+      }
+      error = system (command);
+      assert (error == 0);
+
+      // assemble the file
+      if (pocl_verbose) {
+        fprintf(stderr, "[pocl] assembling files: %s -> %s\n", resched_asmfile, objfile);
+        fflush(stderr);
+      }
+      error = snprintf (command, COMMAND_LENGTH,
+            assembly_cmd, kernel->function_name, objfile, resched_asmfile);
       assert (error >= 0);
 
       if (pocl_verbose) {
