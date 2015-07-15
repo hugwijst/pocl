@@ -39,6 +39,8 @@
 #include "topology/pocl_topology.h"
 
 #include <endian.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include <assert.h>
 #include <string.h>
@@ -433,7 +435,6 @@ void
 pocl_rvex_read (void *data, void *host_ptr, const void *device_ptr,
     size_t offset, size_t cb)
 {
-  int res;
   struct data *d = (struct data*) data;
   chunk_info_t *chunk = (chunk_info_t*)device_ptr;
 
@@ -443,32 +444,39 @@ pocl_rvex_read (void *data, void *host_ptr, const void *device_ptr,
     fflush(stderr);
   }
 
-  FILE *f = fopen(rvex_dev_get_memfile(d->rvdev), "r");
-  if (f == NULL) {
+  int f = open(rvex_dev_get_memfile(d->rvdev), O_RDONLY);
+  if (f < 0) {
     fprintf(stderr, "Couldn't open %s for reading!\n", rvex_dev_get_memfile(d->rvdev));
     return;
   }
 
-  res = fseek(f, chunk->start_address + offset, SEEK_SET);
-  if (res != 0) {
-    fclose(f);
+  off_t newoff = lseek(f, chunk->start_address + offset, SEEK_SET);
+  if (newoff == (off_t)-1) {
+    close(f);
     return;
   }
 
-  res = fread(host_ptr, cb, 1, f);
-  fclose(f);
+  while (cb > 0) {
+    ssize_t read_bytes = read(f, host_ptr, cb);
 
-  if (res != 1) {
-    fprintf(stderr, "Reading from device failed (addr: %u, size: %zu)!\n",
-        (uint32_t) device_ptr, cb);
+    if (read_bytes < 0) {
+      fprintf(stderr, "Reading from device failed (addr: 0x%zx, size: %zu)!\n",
+          chunk->start_address + offset, cb);
+      close(f);
+      return;
+    }
+
+    cb -= read_bytes;
+    host_ptr += read_bytes;
+    offset += read_bytes;
   }
+  close(f);
 }
 
 void
 pocl_rvex_write (void *data, const void *host_ptr, void *device_ptr,
     size_t offset, size_t cb)
 {
-  int res;
   struct data *d = (struct data*) data;
   chunk_info_t *chunk = (chunk_info_t*)device_ptr;
 
@@ -478,25 +486,33 @@ pocl_rvex_write (void *data, const void *host_ptr, void *device_ptr,
     fflush(stderr);
   }
 
-  FILE *f = fopen(rvex_dev_get_memfile(d->rvdev), "r+");
-  if (f == NULL) {
+  int f = open(rvex_dev_get_memfile(d->rvdev), O_WRONLY);
+  if (f < 0) {
     fprintf(stderr, "Couldn't open %s for writing!\n", rvex_dev_get_memfile(d->rvdev));
     return;
   }
 
-  res = fseek(f, chunk->start_address + offset, SEEK_SET);
-  if (res != 0) {
-    fclose(f);
+  off_t newoff = lseek(f, chunk->start_address + offset, SEEK_SET);
+  if (newoff == (off_t)-1) {
+    close(f);
     return;
   }
 
-  res = fwrite(host_ptr, cb, 1, f);
-  fclose(f);
+  while (cb > 0) {
+    ssize_t written_bytes = write(f, host_ptr, cb);
 
-  if (res != 1) {
-    fprintf(stderr, "Writing to device failed (addr: %u, size: %zu)!\n",
-        (uint32_t) device_ptr, cb);
+    if (written_bytes < 0) {
+      fprintf(stderr, "Writing to device failed (addr: 0x%zx, size: %zu)!\n",
+          chunk->start_address + offset, cb);
+      close(f);
+      return;
+    }
+
+    cb -= written_bytes;
+    host_ptr += written_bytes;
+    offset += written_bytes;
   }
+  close(f);
 }
 
 /* The rVEX is a 32-bit big-endian architecture. Define our own pocl-context
