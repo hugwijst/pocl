@@ -352,6 +352,13 @@ unsigned int
 pocl_rvex_probe(struct pocl_device_ops *ops)
 {
   size_t count;
+  int env_count = pocl_device_get_env_count(ops->device_name);
+
+  if (env_count == 0) {
+    // Devices specified using env_count and rvex not specified
+    // Don't search for devices
+    return 0;
+  }
   get_devices(&count, NULL);
 
   return count;
