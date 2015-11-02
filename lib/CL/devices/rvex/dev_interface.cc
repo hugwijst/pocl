@@ -4,6 +4,7 @@
 
 #include <libudev.h>
 
+#include <iomanip>
 #include <sstream>
 #include <fstream>
 
@@ -193,7 +194,7 @@ const char *rvex_dev_get_memfile(struct rvex_core *core) {
     _type res;                                                                \
     std::ifstream f(core->syspath() + "/context0/"#_reg);                     \
                                                                               \
-    f >> res;                                                                 \
+    f >> std::setbase(0) >> res;                                              \
     return res;                                                               \
   }
 
@@ -216,3 +217,14 @@ RVEX_DEV_GET(run, bool);
 RVEX_DEV_SET(run, bool);
 
 RVEX_DEV_GET(done, bool);
+
+/* Get committed bundle count */
+RVEX_DEV_GET(cbun,   uint32_t);
+/* Get active cycles (includes stalled cycles) */
+RVEX_DEV_GET(ccyc,   uint32_t);
+/* Get committed nop count */
+RVEX_DEV_GET(cnop,   uint32_t);
+/* Get stalled cycles */
+RVEX_DEV_GET(cstall, uint32_t);
+/* Get committed syllable count */
+RVEX_DEV_GET(csyl,   uint32_t);

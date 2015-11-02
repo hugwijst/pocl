@@ -34,6 +34,12 @@ void rvex_dev_set_run(struct rvex_core *dev, bool val);
 
 bool rvex_dev_get_done(struct rvex_core *dev);
 
+uint32_t rvex_dev_get_cbun(struct rvex_core *dev);
+uint32_t rvex_dev_get_ccyc(struct rvex_core *dev);
+uint32_t rvex_dev_get_cnop(struct rvex_core *dev);
+uint32_t rvex_dev_get_cstall(struct rvex_core *dev);
+uint32_t rvex_dev_get_csyl(struct rvex_core *dev);
+
 #ifdef __cplusplus
 }
 #endif
