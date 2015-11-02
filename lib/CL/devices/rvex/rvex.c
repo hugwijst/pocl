@@ -841,25 +841,36 @@ pocl_rvex_read_rect (void *data,
                       size_t const host_row_pitch,
                       size_t const host_slice_pitch)
 {
-  /* Not yet implemnted */
-  char const *__restrict const adjusted_device_ptr = 
-    (char const*)device_ptr +
-      buffer_origin[2] * buffer_slice_pitch + buffer_origin[1] * buffer_row_pitch + buffer_origin[0];
+  size_t device_const_offset =
+      buffer_origin[2] * buffer_slice_pitch +
+      buffer_origin[1] * buffer_row_pitch +
+      buffer_origin[0];
+
   char *__restrict__ const adjusted_host_ptr = 
-    (char*)host_ptr +
-      host_origin[2] * host_slice_pitch + host_origin[1] * host_row_pitch + host_origin[0];
+      host_ptr +
+      host_origin[2] * host_slice_pitch +
+      host_origin[1] * host_row_pitch +
+      host_origin[0];
 
   size_t j, k;
   
   /* TODO: handle overlaping regions */
-  
-#if 0
+
   for (k = 0; k < region[2]; ++k)
-    for (j = 0; j < region[1]; ++j)
-      memcpy (adjusted_host_ptr + host_row_pitch * j + host_slice_pitch * k,
-              adjusted_device_ptr + buffer_row_pitch * j + buffer_slice_pitch * k,
-              region[0]);
-#endif
+    if (buffer_row_pitch == region[0] && host_row_pitch == region[0]) {
+      pocl_rvex_read(data,
+          adjusted_host_ptr + host_slice_pitch * k,
+          device_ptr,
+          device_const_offset + buffer_slice_pitch * k,
+          region[0] * region[1]);
+    } else {
+      for (j = 0; j < region[1]; ++j)
+        pocl_rvex_read(data,
+            adjusted_host_ptr + host_row_pitch * j + host_slice_pitch * k,
+            device_ptr,
+            device_const_offset + buffer_row_pitch * j + buffer_slice_pitch * k,
+            region[0]);
+    }
 }
 
 /* origin and region must be in original shape unlike in copy/read/write_rect()
@@ -920,7 +931,7 @@ pocl_rvex_uninit (cl_device_id device)
 cl_ulong
 pocl_rvex_get_timer_value (void *data) 
 {
-  /* Not yet implemented */
+  /* Just use the timer functionality of the PC. */
 #ifndef _MSC_VER
   struct timeval current;
   gettimeofday(&current, NULL);  
