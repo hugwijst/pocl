@@ -444,11 +444,15 @@ pocl_rvex_read (void *data, void *host_ptr, const void *device_ptr,
 {
   struct data *d = (struct data*) data;
   chunk_info_t *chunk = (chunk_info_t*)device_ptr;
+  size_t bytes_left = cb;
+  struct timespec tw1, tw2;
 
   if (pocl_get_bool_option("POCL_VERBOSE", 0)) {
-    fprintf(stderr, "[pocl] reading %zu bytes from 0x%zx+0x%zx\n", cb,
-        chunk->start_address, offset);
+    fprintf(stderr, "[pocl] reading %zu bytes from 0x%zx+0x%zx to %p\n", cb,
+        chunk->start_address, offset, host_ptr);
     fflush(stderr);
+
+    clock_gettime(CLOCK_MONOTONIC, &tw1);
   }
 
   int f = open(rvex_dev_get_memfile(d->rvdev), O_RDONLY);
@@ -463,34 +467,51 @@ pocl_rvex_read (void *data, void *host_ptr, const void *device_ptr,
     return;
   }
 
-  while (cb > 0) {
-    ssize_t read_bytes = read(f, host_ptr, cb);
+  while (bytes_left > 0) {
+    ssize_t read_bytes = read(f, host_ptr, bytes_left);
 
     if (read_bytes < 0) {
       fprintf(stderr, "Reading from device failed (addr: 0x%zx, size: %zu)!\n",
-          chunk->start_address + offset, cb);
+          chunk->start_address + offset, bytes_left);
       close(f);
       return;
     }
 
-    cb -= read_bytes;
+    bytes_left -= read_bytes;
     host_ptr += read_bytes;
     offset += read_bytes;
   }
   close(f);
+
+  if (pocl_get_bool_option("POCL_VERBOSE", 0)) {
+    struct tw2;
+    double walltime;
+
+    clock_gettime(CLOCK_MONOTONIC, &tw2);
+    walltime = 1000.0*tw2.tv_sec + 1e-6*tw2.tv_nsec -
+      (1000.0*tw1.tv_sec + 1e-6*tw1.tv_nsec);
+
+    printf("[pocl] Reading %zu bytes took %.2f ms, speed: %.2f MB/s\n", cb,
+        walltime, cb / walltime / 1000);
+  }
 }
 
 void
 pocl_rvex_write (void *data, const void *host_ptr, void *device_ptr,
-    size_t offset, size_t cb)
+    size_t offset, const size_t cb)
 {
   struct data *d = (struct data*) data;
   chunk_info_t *chunk = (chunk_info_t*)device_ptr;
+  size_t bytes_left = cb;
+  struct timespec tw1, tw2;
 
   if (pocl_get_bool_option("POCL_VERBOSE", 0)) {
     fprintf(stderr, "[pocl] writing %zu bytes to 0x%zx+0x%zx\n", cb,
         chunk->start_address, offset);
     fflush(stderr);
+    uint32_t const *w = host_ptr;
+
+    clock_gettime(CLOCK_MONOTONIC, &tw1);
   }
 
   int f = open(rvex_dev_get_memfile(d->rvdev), O_WRONLY);
@@ -505,21 +526,33 @@ pocl_rvex_write (void *data, const void *host_ptr, void *device_ptr,
     return;
   }
 
-  while (cb > 0) {
-    ssize_t written_bytes = write(f, host_ptr, cb);
+  while (bytes_left > 0) {
+    ssize_t written_bytes = write(f, host_ptr, bytes_left);
 
     if (written_bytes < 0) {
       fprintf(stderr, "Writing to device failed (addr: 0x%zx, size: %zu)!\n",
-          chunk->start_address + offset, cb);
+          chunk->start_address + offset, bytes_left);
       close(f);
       return;
     }
 
-    cb -= written_bytes;
+    bytes_left -= written_bytes;
     host_ptr += written_bytes;
     offset += written_bytes;
   }
   close(f);
+
+  if (pocl_get_bool_option("POCL_VERBOSE", 0)) {
+    struct tw2;
+    double walltime;
+
+    clock_gettime(CLOCK_MONOTONIC, &tw2);
+    walltime = 1000.0*tw2.tv_sec + 1e-6*tw2.tv_nsec -
+      (1000.0*tw1.tv_sec + 1e-6*tw1.tv_nsec);
+
+    printf("[pocl] Writing %zu bytes took %.2f ms, speed: %.2f MB/s\n", cb,
+        walltime, cb / walltime / 1000);
+  }
 }
 
 /* The rVEX is a 32-bit big-endian architecture. Define our own pocl-context
