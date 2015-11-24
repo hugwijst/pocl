@@ -80,6 +80,18 @@ int __pocl_is_out_of_bounds (ADDRESS_SPACE dev_image_t* dev_image, int4 coord,
           return 1;
         }
     }
+  if (dev_image->is_array)
+    {
+      if(coord.z >= dev_image->image_array_size || coord.z < 0)
+        {
+          (*color)[0] = 0;
+          (*color)[1] = 0;
+          (*color)[2] = 0;
+          (*color)[3] = 0;
+
+          return 1;
+        }
+    }
   return 0;
 }
 
@@ -194,5 +206,8 @@ void __pocl_read_pixel (void* color, ADDRESS_SPACE dev_image_t* dev_image, int4 
 /* read_image function instantions */
 IMPLEMENT_READ_IMAGE_INT_COORD(image2d_t, uint4, ui, int2)
 IMPLEMENT_READ_IMAGE_INT_COORD(image2d_t, int4, i, int2)
+IMPLEMENT_READ_IMAGE_INT_COORD(image2d_array_t, uint4, ui, int4)
+IMPLEMENT_READ_IMAGE_INT_COORD(image2d_array_t, int4, i, int4)
 IMPLEMENT_READ_IMAGE_INT_COORD(image3d_t, uint4, ui, int4)
 IMPLEMENT_READ_IMAGE_INT_COORD(image2d_t, float4, f, int2)
+

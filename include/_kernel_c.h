@@ -232,11 +232,17 @@ uint4 _CL_OVERLOADABLE read_imageui (image2d_t image, sampler_t sampler,
 uint4 _CL_OVERLOADABLE read_imageui (image2d_t image, sampler_t sampler, 
                                      int4 coord);
 
+uint4 _CL_OVERLOADABLE read_imageui (image2d_array_t image, sampler_t sampler, 
+                                     int4 coord);
+
 uint4 _CL_OVERLOADABLE read_imageui (image3d_t image, sampler_t sampler, 
                                      int4 coord);
 
 int4 _CL_OVERLOADABLE read_imagei (image2d_t image, sampler_t sampler, 
                                    int2 coord);
+
+int4 _CL_OVERLOADABLE read_imagei (image2d_array_t image, sampler_t sampler, 
+                                     int4 coord);
 
 
 void _CL_OVERLOADABLE write_imagei (image2d_t image, int2 coord, int4 color);
@@ -251,12 +257,12 @@ void _CL_OVERLOADABLE write_imagef (image2d_t image, int2 coord,
 void _CL_OVERLOADABLE write_imagef (image2d_array_t image, int4 coord,
                                     float4 color);
 
+*/
 void _CL_OVERLOADABLE write_imagei (image2d_array_t image, int4 coord,
                                     int4 color);
-
 void _CL_OVERLOADABLE write_imageui (image2d_array_t image, int4 coord,
                                      uint4 color);
-
+/*
 void _CL_OVERLOADABLE write_imagef (image1d_t image, int coord,
                                     float4 color);
 
@@ -289,13 +295,16 @@ void _CL_OVERLOADABLE write_imageui (image3d_t image, int4 coord,
 */
 int _CL_OVERLOADABLE get_image_width (image1d_t image);
 int _CL_OVERLOADABLE get_image_width (image2d_t image);
+int _CL_OVERLOADABLE get_image_width (image2d_array_t image);
 int _CL_OVERLOADABLE get_image_width (image3d_t image);
 
 int _CL_OVERLOADABLE get_image_height (image1d_t image);
 int _CL_OVERLOADABLE get_image_height (image2d_t image);
+int _CL_OVERLOADABLE get_image_height (image2d_array_t image);
 int _CL_OVERLOADABLE get_image_height (image3d_t image);
 
 int _CL_OVERLOADABLE get_image_depth (image1d_t image);
 int _CL_OVERLOADABLE get_image_depth (image2d_t image);
+int _CL_OVERLOADABLE get_image_depth (image2d_array_t image);
 int _CL_OVERLOADABLE get_image_depth (image3d_t image);
 #endif

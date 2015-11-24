@@ -59,6 +59,7 @@ typedef int dev_sampler_t;
 
 typedef struct dev_image_t {
   void* data;
+  int is_array;
   int width;
   int height;
   int depth;

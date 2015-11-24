@@ -94,9 +94,16 @@ TYPE_SUPPORTED:
 
     /* maybe they are implemented */
     if (image_desc->image_type != CL_MEM_OBJECT_IMAGE2D &&
+        image_desc->image_type != CL_MEM_OBJECT_IMAGE2D_ARRAY &&
         image_desc->image_type != CL_MEM_OBJECT_IMAGE3D) {
         POCL_ABORT_UNIMPLEMENTED("clCreateImage with images other than "
-        "CL_MEM_OBJECT_IMAGE2D or CL_MEM_OBJECT_IMAGE3D");
+        "CL_MEM_OBJECT_IMAGE2D(_ARRAY)? or CL_MEM_OBJECT_IMAGE3D");
+    }
+
+    size_t image_array_size = 1;
+    if (image_desc->image_type == CL_MEM_OBJECT_IMAGE1D_ARRAY ||
+        image_desc->image_type == CL_MEM_OBJECT_IMAGE2D_ARRAY) {
+      image_array_size = image_desc->image_array_size;
     }
     
     pocl_get_image_information (image_format->image_channel_order,
@@ -106,8 +113,8 @@ TYPE_SUPPORTED:
     row_pitch = image_desc->image_row_pitch;
     slice_pitch = image_desc->image_slice_pitch;
     
-    size = image_desc->image_width * image_desc->image_height * elem_size * 
-      channels;
+    size = image_desc->image_width * image_desc->image_height *
+      image_array_size * elem_size * channels;
     
     if (row_pitch == 0)
       {
