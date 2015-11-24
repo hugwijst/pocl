@@ -56,22 +56,35 @@ void pocl_write_pixel (void* color_, void* image, int4 coord)
       return;
     }
 
-  for (i = 0; i < num_channels; i++)
-    {
-      idx = i + (coord.x + coord.y*width + coord.z*height*width)*num_channels;
-      if (elem_size == 1)
-        {
-          ((uchar*)dev_image->data)[idx] = (*color)[i];          
-        }
-      if (elem_size == 2)
-        {
-          ((ushort*)dev_image->data)[idx] = (*color)[i];
-        }
-      if (elem_size == 4)
-        {
-          ((uint*)dev_image->data)[idx] = (*color)[i];
-        }
+#if __BIG_ENDIAN__
+  if (elem_size == 1 && num_channels == 4) {
+    idx = coord.x + coord.y*width + coord.z*height*width;
+    uint vec = 0;
+    for (i = 0; i < 4; i++) {
+      vec <<= 8;
+      vec |= (uint)(*color)[i];
     }
+    ((uint*)dev_image->data)[idx] = vec;
+  } else
+#endif
+  {
+    for (i = 0; i < num_channels; i++)
+      {
+        idx = i + (coord.x + coord.y*width + coord.z*height*width)*num_channels;
+        if (elem_size == 1)
+          {
+            ((uchar*)dev_image->data)[idx] = (*color)[i];
+          }
+        if (elem_size == 2)
+          {
+            ((ushort*)dev_image->data)[idx] = (*color)[i];
+          }
+        if (elem_size == 4)
+          {
+            ((uint*)dev_image->data)[idx] = (*color)[i];
+          }
+      }
+  }
 }
 
 /* Implementation for write_image with any image data type and int coordinates 
