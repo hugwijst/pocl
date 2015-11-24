@@ -34,9 +34,11 @@ rvex_llvm_codegen (const char* tmpdir, cl_kernel kernel, cl_device_id device) {
     pocl_get_string_option("POCL_VERBOSE", (char*)NULL);
   int pocl_verbose = pocl_verbose_ptr && *pocl_verbose_ptr;
 
-  static const char* const assembly_cmd = "rvex-elf32-as --issue 8 --config 3333337B --borrow 1.0.3.2.5.4.7.6 --defsym WG_FUNCTION=%s_workgroup -o %s %s";
+  static const char* const assembly_cmd = "rvex-elf32-as --issue 8 --config 3333337B --borrow 1.0.3.2.5.4.7.6 -o %s %s";
+  static const char* const start_sed = "sed s/:KERN_FUNC:/%s/ %s | %s";
 
   char command[COMMAND_LENGTH];
+  char command2[COMMAND_LENGTH];
   char bytecode[POCL_FILENAME_LENGTH];
   char objfile[POCL_FILENAME_LENGTH];
   char resched_asmfile[POCL_FILENAME_LENGTH];
@@ -119,7 +121,7 @@ rvex_llvm_codegen (const char* tmpdir, cl_kernel kernel, cl_device_id device) {
         fflush(stderr);
       }
       error = snprintf (command, COMMAND_LENGTH,
-            assembly_cmd, kernel->function_name, objfile, resched_asmfile);
+            assembly_cmd, objfile, resched_asmfile);
       assert (error >= 0);
 
       if (pocl_verbose) {
@@ -135,10 +137,16 @@ rvex_llvm_codegen (const char* tmpdir, cl_kernel kernel, cl_device_id device) {
         fflush(stderr);
       }
       error = snprintf (command, COMMAND_LENGTH,
-            assembly_cmd, kernel->function_name, start_objfile, start_asmfile);
+            assembly_cmd, start_objfile, "-");
       assert (error >= 0);
+      error = snprintf(command2, COMMAND_LENGTH, start_sed, kernel->function_name,
+          start_asmfile, command);
 
-      error = system (command);
+      if (pocl_verbose) {
+        fprintf(stderr, "[pocl] executing [%s]\n", command2);
+        fflush(stderr);
+      }
+      error = system (command2);
       assert (error == 0);
 
       // link the object files into one object file

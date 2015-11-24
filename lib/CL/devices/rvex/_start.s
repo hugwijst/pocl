@@ -32,7 +32,7 @@ _start::
 ;;
     c0  ldw $r0.4 = _p_arg1[$r0.0]
 ;;
-	c0	call $l0.0 = _dot_product_workgroup_fast
+	c0	call $l0.0 = _:KERN_FUNC:_workgroup_fast
 ;;
 __END:
 	c0	stop
