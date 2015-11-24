@@ -40,7 +40,6 @@
 
 #include <endian.h>
 #include <fcntl.h>
-#include <unistd.h>
 
 #include <assert.h>
 #include <string.h>
@@ -1073,22 +1072,6 @@ static void check_compiler_cache (_cl_command_node *cmd)
                                         cmd->command.run.kernel,
                                         cmd->device);
   cmd->command.run.wg = (void*)module_fn;
-#if 0
-  /* TODO: load correct workgroup info in structures */
-  dlhandle = lt_dlopen (module_fn);
-  if (dlhandle == NULL)
-    {
-      printf ("pocl error: lt_dlopen(\"%s\") failed with '%s'.\n", 
-              module_fn, lt_dlerror());
-      printf ("note: missing symbols in the kernel binary might be" 
-              "reported as 'file not found' errors.\n");
-      abort();
-    }
-  snprintf (workgroup_string, WORKGROUP_STRING_LENGTH,
-            "_%s_workgroup", cmd->command.run.kernel->function_name);
-  cmd->command.run.wg = ci->wg = 
-    (pocl_workgroup) lt_dlsym (dlhandle, workgroup_string);
-#endif
 
   LL_APPEND (compiler_cache, ci);
   POCL_UNLOCK (compiler_cache_lock);
