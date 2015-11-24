@@ -32,8 +32,14 @@ rvex_llvm_codegen (const char* tmpdir, cl_kernel kernel, cl_device_id device) {
 
   int pocl_verbose = pocl_get_bool_option("POCL_VERBOSE", 0);
 
-  static const char* const assembly_cmd = "rvex-elf32-as --issue 8 --config 3333337B --borrow 1.0.3.2.5.4.7.6 -o %s %s";
   static const char* const start_sed = "sed s/:KERN_FUNC:/%s/ %s | %s";
+#if 1
+  static const char* const assembly_cmd = "rvex-elf32-as --issue 8 --config 3333337B --borrow 1.0.3.2.5.4.7.6 -o %s %s";
+#elif 0
+  static const char* const assembly_cmd = "rvex-elf32-as --issue 4 --config 337B --borrow 1.0.3.2 -o %s %s";
+#else
+  static const char* const assembly_cmd = "rvex-elf32-as --issue 2 --config 7B --borrow 1.0 -o %s %s";
+#endif
 
   char command[COMMAND_LENGTH];
   char command2[COMMAND_LENGTH];
@@ -98,12 +104,18 @@ rvex_llvm_codegen (const char* tmpdir, cl_kernel kernel, cl_device_id device) {
       assert (error == 0);
 
       // reschedule the generated assembly
+#if 1
       if (pocl_verbose) {
         fprintf(stderr, "[pocl] rescheduling assembly file: %s -> %s\n", asmfile, resched_asmfile);
         fflush(stderr);
       }
+#if 1
       error = snprintf (command, COMMAND_LENGTH,
             "vexparse %s --resched --borrow=1.0.3.2.5.4.7.6 --config=3333337B -o %s", asmfile, resched_asmfile);
+#else
+      error = snprintf (command, COMMAND_LENGTH,
+            "vexparse %s --resched --borrow=1.0.3.2 --config=337B -o %s", asmfile, resched_asmfile);
+#endif
       assert (error >= 0);
 
       if (pocl_verbose) {
@@ -112,6 +124,9 @@ rvex_llvm_codegen (const char* tmpdir, cl_kernel kernel, cl_device_id device) {
       }
       error = system (command);
       assert (error == 0);
+#else
+      strcpy(resched_asmfile, asmfile);
+#endif
 
       // assemble the file
       if (pocl_verbose) {
