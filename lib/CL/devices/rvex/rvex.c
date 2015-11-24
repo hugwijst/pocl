@@ -568,6 +568,43 @@ static inline size_t align_size(size_t s, size_t psize) {
   return (s + psize - 1) / psize * psize;
 }
 
+typedef struct rvex_dev_image_t {
+  uint32_t data; // size of pointer
+  int32_t is_array;
+  int32_t width;
+  int32_t height;
+  int32_t depth;
+  int32_t image_array_size;
+  int32_t row_pitch;
+  int32_t slice_pitch;
+  int32_t num_mip_levels;
+  int32_t num_samples;
+  int32_t order;
+  int32_t data_type;
+  int32_t num_channels;
+  int32_t elem_size;
+} rvex_dev_image_t;
+
+static void pocl_fill_rvex_dev_image(rvex_dev_image_t* di,
+    struct pocl_argument* parg, cl_device_id device) {
+  cl_mem mem = *(cl_mem *)parg->value;
+  chunk_info_t *chunk = (chunk_info_t*)mem->device_ptrs[device->dev_id].mem_ptr;
+
+  di->is_array = htobe32(mem->type == CL_MEM_OBJECT_IMAGE1D_ARRAY ||
+                         mem->type == CL_MEM_OBJECT_IMAGE2D_ARRAY);
+  di->data             = htobe32(chunk->start_address);
+  di->width            = htobe32(mem->image_width);
+  di->height           = htobe32(mem->image_height);
+  di->depth            = htobe32(mem->image_depth);
+  di->image_array_size = htobe32(mem->image_array_size);
+  di->row_pitch        = htobe32(mem->image_row_pitch);
+  di->slice_pitch      = htobe32(mem->image_slice_pitch);
+  di->order            = htobe32(mem->image_channel_order);
+  di->data_type        = htobe32(mem->image_channel_data_type);
+  di->num_channels     = htobe32(mem->image_channels);
+  di->elem_size        = htobe32(mem->image_elem_size);
+}
+
 void
 pocl_rvex_run 
 (void *data, 
@@ -659,12 +696,12 @@ pocl_rvex_run
       }
 
     } else if (kernel->arg_info[i].type == POCL_ARG_TYPE_IMAGE) {
-      const size_t SIZE = sizeof(dev_image_t);
-      dev_image_t di;
-      fill_dev_image_t (&di, al, cmd->device);
+      rvex_dev_image_t di;
+      const size_t SIZE = sizeof(di);
+      pocl_fill_rvex_dev_image (&di, al, cmd->device);
 
       memcpy(arg_data, &di, SIZE);
-      arg_list[i] = p_arg_data_dev;
+      arg_list[i] = htobe32(p_arg_data_dev);
 
       arg_data += align_size(SIZE, psize);
       p_arg_data_dev += align_size(SIZE, psize);
@@ -741,8 +778,7 @@ pocl_rvex_run
                   rvex_pc.global_offset[i] = htobe32(pc->global_offset[i]);
               }
 
-              pocl_rvex_write(data, &rvex_pc, ctxt_alloc, 0,
-                  sizeof(rvex_pc));
+              pocl_rvex_write(data, &rvex_pc, ctxt_alloc, 0, sizeof(rvex_pc));
 
               rvex_dev_set_run(d->rvdev, false);
               rvex_dev_set_reset_vector(d->rvdev, prog_alloc->start_address + 8);
