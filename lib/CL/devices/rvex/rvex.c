@@ -760,6 +760,11 @@ pocl_rvex_run
     free((void*)binfile);
   }
 
+  struct timespec tw1, tw2, tw3, tw4;
+  uint32_t comm_bundles = 0, cycles = 0;
+  uint32_t cstalled = 0;
+  double walltime = 0.0;
+
   for (z = 0; z < pc->num_groups[2]; ++z)
     {
       for (y = 0; y < pc->num_groups[1]; ++y)
@@ -783,14 +788,27 @@ pocl_rvex_run
               rvex_dev_set_reset_vector(d->rvdev, prog_alloc->start_address + 8);
               rvex_dev_set_reset(d->rvdev, true);
               rvex_dev_set_reset(d->rvdev, false);
+  clock_gettime(CLOCK_MONOTONIC, &tw1);
               rvex_dev_set_run(d->rvdev, true);
 
               while(!rvex_dev_get_done(d->rvdev)) {
-                nanosleep(&(struct timespec){.tv_nsec=1000000}, NULL);
+                  //nanosleep(&(struct timespec){.tv_nsec=10000}, NULL);
               }
+  clock_gettime(CLOCK_MONOTONIC, &tw2);
+  walltime += 1000.0*tw2.tv_sec + 1e-6*tw2.tv_nsec
+                       - (1000.0*tw1.tv_sec + 1e-6*tw1.tv_nsec);
+
+                comm_bundles += rvex_dev_get_cbun(d->rvdev);
+                cycles += rvex_dev_get_ccyc(d->rvdev);
+                cstalled += rvex_dev_get_cstall(d->rvdev);
             }
         }
     }
+
+  if(pocl_get_bool_option("POCL_TIME_EXEC", 0)) {
+      printf("%.2f %u %u %u\n", walltime, comm_bundles, cycles, cstalled);
+  }
+
   /* Copy CL_MEM_USE_HOST_PTR argument data back to the host */
   for (i = 0; i < kernel->num_args; ++i) {
     if (kernel->arg_info[i].type == POCL_ARG_TYPE_POINTER) {
