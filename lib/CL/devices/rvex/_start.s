@@ -13,6 +13,7 @@ _start::
 ;;
 	# Write 0's to _BSS
 	c0	mov $r0.21 = __BSS_START
+;;
 	c0	mov $r0.22 = __BSS_END
 ;;
 	c0	cmpleu $b0.0 = $r0.22, $r0.21
