@@ -30,9 +30,7 @@
 const char*
 rvex_llvm_codegen (const char* tmpdir, cl_kernel kernel, cl_device_id device) {
 
-  const char* pocl_verbose_ptr =
-    pocl_get_string_option("POCL_VERBOSE", (char*)NULL);
-  int pocl_verbose = pocl_verbose_ptr && *pocl_verbose_ptr;
+  int pocl_verbose = pocl_get_bool_option("POCL_VERBOSE", 0);
 
   static const char* const assembly_cmd = "rvex-elf32-as --issue 8 --config 3333337B --borrow 1.0.3.2.5.4.7.6 -o %s %s";
   static const char* const start_sed = "sed s/:KERN_FUNC:/%s/ %s | %s";
@@ -181,9 +179,7 @@ const char*
 rvex_link (const char* tmpdir, const char* objfile, size_t start_address, cl_kernel kernel) {
   int error;
 
-  const char* pocl_verbose_ptr =
-    pocl_get_string_option("POCL_VERBOSE", (char*)NULL);
-  int pocl_verbose = pocl_verbose_ptr && *pocl_verbose_ptr;
+  int pocl_verbose = pocl_get_bool_option("POCL_VERBOSE", 0);
 
   char command[COMMAND_LENGTH];
   char elffile[POCL_FILENAME_LENGTH];
